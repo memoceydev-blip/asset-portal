@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asset-frontend
+  namespace: asset-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asset-frontend
+  template:
+    metadata:
+      labels:
+        app: asset-frontend
+    spec:
+      containers:
+        - name: asset-frontend
+          image: asset-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/nginx/html/config.js
+              subPath: config.js
+      volumes:
+        - name: config-volume
+          configMap:
+            name: asset-frontend-config

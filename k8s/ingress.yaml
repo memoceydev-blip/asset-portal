@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: asset-frontend
+  namespace: asset-portal
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: asset-portal.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: asset-frontend
+                port:
+                  number: 3000

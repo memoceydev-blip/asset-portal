@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asset-backend
+  namespace: asset-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asset-backend
+  template:
+    metadata:
+      labels:
+        app: asset-backend
+    spec:
+      containers:
+        - name: asset-backend
+          image: asset-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - secretRef:
+                name: asset-backend-secret
