@@ -6,6 +6,13 @@ class Base(DeclarativeBase):
     pass
 
 
+class Department(Base):
+    __tablename__ = "departments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    prefix: Mapped[str] = mapped_column(String, unique=True, index=True)
+
+
 class Asset(Base):
     __tablename__ = "assets"
 
@@ -13,6 +20,7 @@ class Asset(Base):
     tag: Mapped[str | None] = mapped_column(String)
     status: Mapped[str | None] = mapped_column(String)
     owner: Mapped[str | None] = mapped_column(String)
+    owner_id: Mapped[int | None] = mapped_column(Integer)
     location: Mapped[str | None] = mapped_column(String)
     os: Mapped[str | None] = mapped_column(String)
     type: Mapped[str | None] = mapped_column(String)
