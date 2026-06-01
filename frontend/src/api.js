@@ -1,10 +1,8 @@
 import axios from "axios";
 import keycloak from "./auth";
 
-const config = window.APP_CONFIG;
-
 export const api = axios.create({
-  baseURL: config.API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
 api.interceptors.request.use((request) => {
