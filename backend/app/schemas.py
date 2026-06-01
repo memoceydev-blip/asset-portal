@@ -18,3 +18,24 @@ class AssetListResponse(BaseModel):
     page: int
     page_size: int
     total: int
+
+
+class AssetSoftwareItem(BaseModel):
+    sw_name: str | None = None
+    sw_version: str | None = None
+
+
+class AssetDetailsResponse(BaseModel):
+    asset_id: int
+    alias: str | None = None
+    kernel: str | None = None
+    os_name: str | None = None
+    os_family: str | None = None
+    os_arch: str | None = None
+    code_name: str | None = None
+    cn_name: str | None = None
+    vendor: str | None = None
+    product_name: str | None = None
+    software: list[AssetSoftwareItem]
+    neighbour_ports: list[str]
+    ip_addresses: list[str]
