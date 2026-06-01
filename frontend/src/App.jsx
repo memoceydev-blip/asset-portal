@@ -1,9 +1,22 @@
+import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
-import { Box, Container, TextField, Typography } from "@mui/material";
+import {
+  AppBar,
+  Box,
+  Container,
+  IconButton,
+  Paper,
+  TextField,
+  Toolbar,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import LightModeIcon from "@mui/icons-material/LightMode";
 import { DataGrid } from "@mui/x-data-grid";
 import { api } from "./api";
 
-export default function App() {
+export default function App({ mode, onToggleColorMode }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
@@ -57,40 +70,68 @@ export default function App() {
   }, [paginationModel, sortModel, search]);
 
   return (
-    <Container maxWidth={false} sx={{ mt: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Asset Master
-      </Typography>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "background.default",
+        color: "text.primary",
+      }}
+    >
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Toolbar sx={{ gap: 2 }}>
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+            Asset Master
+          </Typography>
+          <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
+              {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
+        </Toolbar>
+      </AppBar>
 
-      <Box sx={{ mb: 2, maxWidth: 400 }}>
-        <TextField
-          fullWidth
-          label="Search"
-          value={search}
-          onChange={(e) => {
-            setPaginationModel((prev) => ({ ...prev, page: 0 }));
-            setSearch(e.target.value);
-          }}
-        />
-      </Box>
+      <Container maxWidth={false} sx={{ py: 3 }}>
+        <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+          <TextField
+            fullWidth
+            label="Search"
+            value={search}
+            onChange={(e) => {
+              setPaginationModel((prev) => ({ ...prev, page: 0 }));
+              setSearch(e.target.value);
+            }}
+          />
+        </Paper>
 
-      <Box sx={{ height: 700, width: "100%" }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          rowCount={rowCount}
-          pagination
-          paginationMode="server"
-          sortingMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
-          pageSizeOptions={[25, 50, 100]}
-          disableRowSelectionOnClick
-        />
-      </Box>
-    </Container>
+        <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+          <DataGrid
+            rows={rows}
+            columns={columns}
+            loading={loading}
+            rowCount={rowCount}
+            pagination
+            paginationMode="server"
+            sortingMode="server"
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            pageSizeOptions={[25, 50, 100]}
+            disableRowSelectionOnClick
+            sx={{
+              bgcolor: "background.paper",
+              '& .MuiDataGrid-columnHeaders': {
+                bgcolor: "background.paper",
+              },
+            }}
+          />
+        </Paper>
+      </Container>
+    </Box>
   );
 }
+
+App.propTypes = {
+  mode: PropTypes.oneOf(["light", "dark"]).isRequired,
+  onToggleColorMode: PropTypes.func.isRequired,
+};
