@@ -13,6 +13,13 @@ class Department(Base):
     prefix: Mapped[str] = mapped_column(String, unique=True, index=True)
 
 
+class ViewSet(Base):
+    __tablename__ = "view_set"
+
+    prefix: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+    owner_ids: Mapped[str | None] = mapped_column(String)
+
+
 class Asset(Base):
     __tablename__ = "assets"
 
