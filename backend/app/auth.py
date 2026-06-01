@@ -12,7 +12,7 @@ bearer_scheme = HTTPBearer()
 
 @lru_cache(maxsize=1)
 def get_jwks() -> dict:
-    with httpx.Client(timeout=10.0, verify=True) as client:
+    with httpx.Client(timeout=10.0, verify=False) as client:
         response = client.get(settings.jwks_url)
         response.raise_for_status()
         return response.json()
