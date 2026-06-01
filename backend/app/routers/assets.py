@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import verify_token
 from app.db import get_db
-from app.models import Asset, Department
+from app.models import Asset, ViewSet
 from app.schemas import AssetListResponse
 
 router = APIRouter(prefix="/api/v1/assets", tags=["assets"])
@@ -42,17 +42,35 @@ def list_assets(
         )
 
     prefix = username[:6]
-    department_id = db.execute(
-        select(Department.id).where(Department.prefix == prefix)
+    owner_ids_raw = db.execute(
+        select(ViewSet.owner_ids).where(ViewSet.prefix == prefix)
     ).scalar_one_or_none()
 
-    if department_id is None:
+    if not owner_ids_raw:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No department mapping found for user prefix",
+            detail="No owner mapping found for user prefix",
         )
 
-    stmt = select(Asset).where(Asset.owner_id == department_id)
+    try:
+        owner_ids = [
+            int(owner_id.strip())
+            for owner_id in owner_ids_raw.split(",")
+            if owner_id.strip()
+        ]
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Invalid owner_ids mapping for user prefix",
+        ) from exc
+
+    if not owner_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No owner ids available for user prefix",
+        )
+
+    stmt = select(Asset).where(Asset.owner_id.in_(owner_ids))
 
     filters = []
 
