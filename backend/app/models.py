@@ -51,7 +51,7 @@ class OsInfo(Base):
     os_family: Mapped[str | None] = mapped_column(String)
     os_arch: Mapped[str | None] = mapped_column(String)
     code_name: Mapped[str | None] = mapped_column(String)
-    cn_name: Mapped[str | None] = mapped_column(String)
+    cpe_name: Mapped[str | None] = mapped_column(String)
 
 
 class HwInfo(Base):
