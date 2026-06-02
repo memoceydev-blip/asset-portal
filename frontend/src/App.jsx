@@ -45,10 +45,12 @@ DetailRow.propTypes = {
 function AssetDetailsModal({ assetId, open, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [softwareFilter, setSoftwareFilter] = useState("");
 
   useEffect(() => {
     if (!open || !assetId) {
       setDetails(null);
+      setSoftwareFilter("");
       return;
     }
 
@@ -57,6 +59,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
       try {
         const response = await api.get(`/api/v1/assets/${assetId}`);
         setDetails(response.data);
+        setSoftwareFilter("");
       } finally {
         setLoading(false);
       }
@@ -64,6 +67,23 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
     loadDetails();
   }, [assetId, open]);
+
+  const filteredSoftware = useMemo(() => {
+    if (!details?.software) {
+      return [];
+    }
+
+    const pattern = softwareFilter.trim().toLowerCase();
+    if (!pattern) {
+      return details.software;
+    }
+
+    return details.software.filter((item) => {
+      const name = item.sw_name?.toLowerCase() || "";
+      const version = item.sw_version?.toLowerCase() || "";
+      return name.includes(pattern) || version.includes(pattern);
+    });
+  }, [details, softwareFilter]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -133,22 +153,32 @@ function AssetDetailsModal({ assetId, open, onClose }) {
             <Divider />
 
             <Box>
-              <Typography variant="h6" gutterBottom>
-                Software
-              </Typography>
-              {details.software.length ? (
+              <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 1 }}>
+                <Typography variant="h6">Software</Typography>
+                <TextField
+                  size="small"
+                  label="Filter software"
+                  value={softwareFilter}
+                  onChange={(e) => setSoftwareFilter(e.target.value)}
+                  sx={{ minWidth: { xs: "100%", sm: 260 } }}
+                />
+              </Stack>
+              {filteredSoftware.length ? (
                 <List dense sx={{ maxHeight: 240, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                  {details.software.map((item, index) => (
+                  {filteredSoftware.map((item, index) => (
                     <ListItem key={`${item.sw_name || "software"}-${index}`} divider>
                       <ListItemText
-                        primary={item.sw_name || "-"}
-                        secondary={item.sw_version || "Version unknown"}
+                        primary={`${item.sw_name || "-"} ${item.sw_version ? `(${item.sw_version})` : ""}`.trim()}
                       />
                     </ListItem>
                   ))}
                 </List>
               ) : (
-                <Typography color="text.secondary">No software information available.</Typography>
+                <Typography color="text.secondary">
+                  {details.software.length
+                    ? "No software matches the current filter."
+                    : "No software information available."}
+                </Typography>
               )}
             </Box>
 
