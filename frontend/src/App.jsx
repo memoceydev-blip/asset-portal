@@ -158,20 +158,19 @@ function AssetDetailsModal({ assetId, open, onClose }) {
               <Typography variant="h6" gutterBottom>
                 Network Neighbours
               </Typography>
-              {details.neighbour_ports.length ? (
-                <List dense sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
-                  {details.neighbour_ports.map((item, index) => (
-                    <ListItem key={`${item.network_device || "device"}-${item.local_port || index}`} divider>
-                      <ListItemText
-                        primary={item.network_device || "Unknown device"}
-                        secondary={item.local_port || "Unknown local port"}
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Typography color="text.secondary">No network neighbour information available.</Typography>
-              )}
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {details.neighbour_ports.length ? (
+                  details.neighbour_ports.map((item, index) => (
+                    <Chip
+                      key={`${item.network_device || "device"}-${item.local_port || "local"}-${item.neighbour_port || index}`}
+                      label={`${item.network_device || "Unknown device"} · ${item.local_port || "?"} → ${item.neighbour_port || "?"}`}
+                      variant="outlined"
+                    />
+                  ))
+                ) : (
+                  <Typography color="text.secondary">No network neighbour information available.</Typography>
+                )}
+              </Stack>
             </Box>
 
             <Divider />

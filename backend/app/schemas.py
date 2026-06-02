@@ -30,6 +30,7 @@ class AssetSoftwareItem(BaseModel):
 
 class AssetNeighbourItem(BaseModel):
     local_port: str | None = None
+    neighbour_port: str | None = None
     network_device: str | None = None
 
 

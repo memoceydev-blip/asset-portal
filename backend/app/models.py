@@ -21,7 +21,7 @@ class ViewSet(Base):
 
 
 class Asset(Base):
-    __tablename__ = "assets"
+    __tablename__ = "get_assets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str | None] = mapped_column(String)
@@ -76,6 +76,7 @@ class NetInfo(Base):
 
     asset_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     local_port: Mapped[str | None] = mapped_column(String, primary_key=True)
+    neighbour_port: Mapped[str | None] = mapped_column(String, primary_key=True)
     network_device: Mapped[str | None] = mapped_column(String, primary_key=True)
 
 

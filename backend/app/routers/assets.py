@@ -192,7 +192,7 @@ def get_asset_details(
     neighbour_rows = db.execute(
         select(NetInfo)
         .where(NetInfo.asset_id == asset_id)
-        .order_by(asc(NetInfo.network_device), asc(NetInfo.local_port))
+        .order_by(asc(NetInfo.network_device), asc(NetInfo.local_port), asc(NetInfo.neighbour_port))
     ).scalars().all()
 
     ip_addresses = db.execute(
@@ -219,10 +219,11 @@ def get_asset_details(
         neighbour_ports=[
             AssetNeighbourItem(
                 local_port=row.local_port,
+                neighbour_port=row.neighbour_port,
                 network_device=row.network_device,
             )
             for row in neighbour_rows
-            if row.local_port or row.network_device
+            if row.local_port or row.neighbour_port or row.network_device
         ],
         ip_addresses=[ip for ip in ip_addresses if ip],
     )
