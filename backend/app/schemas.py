@@ -3,12 +3,15 @@ from pydantic import BaseModel, ConfigDict
 
 class AssetOut(BaseModel):
     id: int
+    name: str | None = None
     tag: str | None = None
     status: str | None = None
     owner: str | None = None
     location: str | None = None
     os: str | None = None
     type: str | None = None
+    ips: str | None = None
+    alias: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

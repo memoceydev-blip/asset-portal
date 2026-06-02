@@ -204,13 +204,16 @@ export default function App({ mode, onToggleColorMode }) {
 
   const columns = useMemo(
     () => [
-      { field: "id", headerName: "ID", flex: 0.7 },
-      { field: "tag", headerName: "Tag", flex: 1.2 },
-      { field: "status", headerName: "Status", flex: 1 },
-      { field: "owner", headerName: "Owner", flex: 1.2 },
-      { field: "location", headerName: "Location", flex: 1.2 },
-      { field: "os", headerName: "OS", flex: 1.2 },
-      { field: "type", headerName: "Type", flex: 1.1 },
+      { field: "id", headerName: "ID", flex: 0.6 },
+      { field: "name", headerName: "Name", flex: 1.2 },
+      { field: "tag", headerName: "Tag", flex: 1 },
+      { field: "type", headerName: "Type", flex: 1 },
+      { field: "owner", headerName: "Owner", flex: 1.1 },
+      { field: "location", headerName: "Location", flex: 1.1 },
+      { field: "os", headerName: "OS", flex: 1.1 },
+      { field: "status", headerName: "Status", flex: 0.9 },
+      { field: "ips", headerName: "IPs", flex: 1.3 },
+      { field: "alias", headerName: "Alias", flex: 1.2 },
     ],
     []
   );

@@ -5,19 +5,21 @@ from sqlalchemy.orm import Session
 from app.auth import verify_token
 from app.db import get_db
 from app.models import Asset, HostnameAlias, HwInfo, IpInfo, NetInfo, OsInfo, SwInfo, ViewSet
-from app.schemas import AssetDetailsResponse, AssetListResponse, AssetSoftwareItem
+from app.schemas import AssetDetailsResponse, AssetListResponse, AssetOut, AssetSoftwareItem
 
 router = APIRouter(prefix="/api/v1/assets", tags=["assets"])
 
 SORTABLE_COLUMNS = {
     "id": Asset.id,
+    "name": Asset.name,
     "tag": Asset.tag,
     "status": Asset.status,
     "owner": Asset.owner,
-    "owner_id": Asset.owner_id,
     "location": Asset.location,
     "os": Asset.os,
     "type": Asset.type,
+    "ips": Asset.ips,
+    "alias": HostnameAlias.alias,
 }
 
 
@@ -76,7 +78,11 @@ def list_assets(
 ):
     owner_ids = get_owner_ids_for_user(token_payload, db)
 
-    stmt = select(Asset).where(Asset.owner_id.in_(owner_ids))
+    stmt = (
+        select(Asset, HostnameAlias.alias)
+        .outerjoin(HostnameAlias, HostnameAlias.asset_id == Asset.id)
+        .where(Asset.owner_id.in_(owner_ids))
+    )
 
     filters = []
 
@@ -85,13 +91,15 @@ def list_assets(
         filters.append(
             or_(
                 cast(Asset.id, String).ilike(pattern),
+                Asset.name.ilike(pattern),
                 Asset.tag.ilike(pattern),
                 Asset.status.ilike(pattern),
                 Asset.owner.ilike(pattern),
-                cast(Asset.owner_id, String).ilike(pattern),
                 Asset.location.ilike(pattern),
                 Asset.os.ilike(pattern),
                 Asset.type.ilike(pattern),
+                Asset.ips.ilike(pattern),
+                HostnameAlias.alias.ilike(pattern),
             )
         )
 
@@ -113,13 +121,27 @@ def list_assets(
     sort_column = SORTABLE_COLUMNS.get(sort_by, Asset.id)
     order_clause = desc(sort_column) if sort_dir.lower() == "desc" else asc(sort_column)
 
-    stmt = (
+    rows = db.execute(
         stmt.order_by(order_clause)
         .offset((page - 1) * page_size)
         .limit(page_size)
-    )
+    ).all()
 
-    items = db.execute(stmt).scalars().all()
+    items = [
+        AssetOut(
+            id=asset.id,
+            name=asset.name,
+            tag=asset.tag,
+            status=asset.status,
+            owner=asset.owner,
+            location=asset.location,
+            os=asset.os,
+            type=asset.type,
+            ips=asset.ips,
+            alias=alias,
+        )
+        for asset, alias in rows
+    ]
 
     return AssetListResponse(
         items=items,
