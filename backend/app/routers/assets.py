@@ -205,7 +205,7 @@ def get_asset_details(
         os_family=os_info.os_family if os_info else None,
         os_arch=os_info.os_arch if os_info else None,
         code_name=os_info.code_name if os_info else None,
-        cn_name=os_info.cn_name if os_info else None,
+        cpe_name=os_info.cpe_name if os_info else None,
         vendor=hw_info.vendor if hw_info else None,
         product_name=hw_info.product_name if hw_info else None,
         software=[
