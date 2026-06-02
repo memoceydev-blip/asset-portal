@@ -28,17 +28,22 @@ class AssetSoftwareItem(BaseModel):
     sw_version: str | None = None
 
 
+class AssetNeighbourItem(BaseModel):
+    local_port: str | None = None
+    network_device: str | None = None
+
+
 class AssetDetailsResponse(BaseModel):
     asset_id: int
-    alias: str | None = None
+    aliases: list[str]
     kernel: str | None = None
     os_name: str | None = None
     os_family: str | None = None
     os_arch: str | None = None
     code_name: str | None = None
-    cn_name: str | None = None
+    cpe_name: str | None = None
     vendor: str | None = None
     product_name: str | None = None
     software: list[AssetSoftwareItem]
-    neighbour_ports: list[str]
+    neighbour_ports: list[AssetNeighbourItem]
     ip_addresses: list[str]

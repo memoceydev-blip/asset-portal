@@ -4,8 +4,14 @@ from sqlalchemy.orm import Session
 
 from app.auth import verify_token
 from app.db import get_db
-from app.models import Asset, HostnameAlias, HwInfo, IpInfo, NetInfo, OsInfo, SwInfo, ViewSet
-from app.schemas import AssetDetailsResponse, AssetListResponse, AssetOut, AssetSoftwareItem
+from app.models import AliasInfo, Asset, HwInfo, IpInfo, NetInfo, OsInfo, SwInfo, ViewSet
+from app.schemas import (
+    AssetDetailsResponse,
+    AssetListResponse,
+    AssetNeighbourItem,
+    AssetOut,
+    AssetSoftwareItem,
+)
 
 router = APIRouter(prefix="/api/v1/assets", tags=["assets"])
 
@@ -19,7 +25,7 @@ SORTABLE_COLUMNS = {
     "os": Asset.os,
     "type": Asset.type,
     "ips": Asset.ips,
-    "alias": HostnameAlias.alias,
+    "alias": Asset.alias,
 }
 
 
@@ -78,11 +84,7 @@ def list_assets(
 ):
     owner_ids = get_owner_ids_for_user(token_payload, db)
 
-    stmt = (
-        select(Asset, HostnameAlias.alias)
-        .outerjoin(HostnameAlias, HostnameAlias.asset_id == Asset.id)
-        .where(Asset.owner_id.in_(owner_ids))
-    )
+    stmt = select(Asset).where(Asset.owner_id.in_(owner_ids))
 
     filters = []
 
@@ -99,7 +101,7 @@ def list_assets(
                 Asset.os.ilike(pattern),
                 Asset.type.ilike(pattern),
                 Asset.ips.ilike(pattern),
-                HostnameAlias.alias.ilike(pattern),
+                Asset.alias.ilike(pattern),
             )
         )
 
@@ -125,7 +127,7 @@ def list_assets(
         stmt.order_by(order_clause)
         .offset((page - 1) * page_size)
         .limit(page_size)
-    ).all()
+    ).scalars().all()
 
     items = [
         AssetOut(
@@ -138,9 +140,9 @@ def list_assets(
             os=asset.os,
             type=asset.type,
             ips=asset.ips,
-            alias=alias,
+            alias=asset.alias,
         )
-        for asset, alias in rows
+        for asset in rows
     ]
 
     return AssetListResponse(
@@ -169,9 +171,11 @@ def get_asset_details(
             detail="Asset not found",
         )
 
-    alias = db.execute(
-        select(HostnameAlias.alias).where(HostnameAlias.asset_id == asset_id)
-    ).scalar_one_or_none()
+    aliases = db.execute(
+        select(AliasInfo.alias)
+        .where(AliasInfo.asset_id == asset_id)
+        .order_by(asc(AliasInfo.alias))
+    ).scalars().all()
 
     os_info = db.execute(
         select(OsInfo).where(OsInfo.asset_id == asset_id)
@@ -185,10 +189,10 @@ def get_asset_details(
         select(SwInfo).where(SwInfo.asset_id == asset_id).order_by(asc(SwInfo.sw_name))
     ).scalars().all()
 
-    neighbour_ports = db.execute(
-        select(NetInfo.neighbour_port)
+    neighbour_rows = db.execute(
+        select(NetInfo)
         .where(NetInfo.asset_id == asset_id)
-        .order_by(asc(NetInfo.neighbour_port))
+        .order_by(asc(NetInfo.network_device), asc(NetInfo.local_port))
     ).scalars().all()
 
     ip_addresses = db.execute(
@@ -199,7 +203,7 @@ def get_asset_details(
 
     return AssetDetailsResponse(
         asset_id=asset_id,
-        alias=alias,
+        aliases=[alias for alias in aliases if alias],
         kernel=os_info.kernel if os_info else None,
         os_name=os_info.os_name if os_info else None,
         os_family=os_info.os_family if os_info else None,
@@ -212,6 +216,13 @@ def get_asset_details(
             AssetSoftwareItem(sw_name=row.sw_name, sw_version=row.sw_version)
             for row in software_rows
         ],
-        neighbour_ports=[port for port in neighbour_ports if port],
+        neighbour_ports=[
+            AssetNeighbourItem(
+                local_port=row.local_port,
+                network_device=row.network_device,
+            )
+            for row in neighbour_rows
+            if row.local_port or row.network_device
+        ],
         ip_addresses=[ip for ip in ip_addresses if ip],
     )

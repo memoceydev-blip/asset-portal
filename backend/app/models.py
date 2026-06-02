@@ -21,7 +21,7 @@ class ViewSet(Base):
 
 
 class Asset(Base):
-    __tablename__ = "get_assets"
+    __tablename__ = "assets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str | None] = mapped_column(String)
@@ -33,13 +33,14 @@ class Asset(Base):
     os: Mapped[str | None] = mapped_column(String)
     type: Mapped[str | None] = mapped_column(String)
     ips: Mapped[str | None] = mapped_column(String)
+    alias: Mapped[str | None] = mapped_column(String)
 
 
-class HostnameAlias(Base):
-    __tablename__ = "hostname_alias"
+class AliasInfo(Base):
+    __tablename__ = "alias_info"
 
     asset_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    alias: Mapped[str | None] = mapped_column(String)
+    alias: Mapped[str | None] = mapped_column(String, primary_key=True)
 
 
 class OsInfo(Base):
@@ -74,7 +75,8 @@ class NetInfo(Base):
     __tablename__ = "net_info"
 
     asset_id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    neighbour_port: Mapped[str | None] = mapped_column(String, primary_key=True)
+    local_port: Mapped[str | None] = mapped_column(String, primary_key=True)
+    network_device: Mapped[str | None] = mapped_column(String, primary_key=True)
 
 
 class IpInfo(Base):

@@ -75,9 +75,15 @@ function AssetDetailsModal({ assetId, open, onClose }) {
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6" gutterBottom>
-                Hostname
+                Aliases
               </Typography>
-              <DetailRow label="Alias" value={details.alias} />
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {details.aliases.length ? (
+                  details.aliases.map((alias) => <Chip key={alias} label={alias} variant="outlined" />)
+                ) : (
+                  <Typography color="text.secondary">No aliases available.</Typography>
+                )}
+              </Stack>
             </Box>
 
             <Divider />
@@ -103,7 +109,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   <DetailRow label="Code Name" value={details.code_name} />
                 </Box>
                 <Box sx={{ minWidth: 180, flex: 1 }}>
-                  <DetailRow label="Common Name" value={details.cn_name} />
+                  <DetailRow label="CPE Name" value={details.cpe_name} />
                 </Box>
               </Stack>
             </Box>
@@ -150,15 +156,22 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
             <Box>
               <Typography variant="h6" gutterBottom>
-                Network Neighbour Ports
+                Network Neighbours
               </Typography>
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {details.neighbour_ports.length ? (
-                  details.neighbour_ports.map((port) => <Chip key={port} label={port} variant="outlined" />)
-                ) : (
-                  <Typography color="text.secondary">No neighbour ports available.</Typography>
-                )}
-              </Stack>
+              {details.neighbour_ports.length ? (
+                <List dense sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}>
+                  {details.neighbour_ports.map((item, index) => (
+                    <ListItem key={`${item.network_device || "device"}-${item.local_port || index}`} divider>
+                      <ListItemText
+                        primary={item.network_device || "Unknown device"}
+                        secondary={item.local_port || "Unknown local port"}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              ) : (
+                <Typography color="text.secondary">No network neighbour information available.</Typography>
+              )}
             </Box>
 
             <Divider />
