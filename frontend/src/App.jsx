@@ -6,9 +6,6 @@ import {
   Box,
   Chip,
   Container,
-  Dialog,
-  DialogContent,
-  DialogTitle,
   Divider,
   Drawer,
   IconButton,
@@ -30,6 +27,7 @@ import { DataGrid } from "@mui/x-data-grid";
 import { api } from "./api";
 
 const DRAWER_WIDTH = 240;
+const DETAILS_PAGE_KEY = "asset-portal-details-record";
 
 function normalizeAssetDetails(data) {
   return {
@@ -65,15 +63,15 @@ DetailRow.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
-function AssetDetailsModal({ assetRecord, open, onClose }) {
+function AssetDetailsPage({ assetRecord, onBack }) {
   const [details, setDetails] = useState(normalizeAssetDetails());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!open || !assetRecord?.id) {
+    if (!assetRecord?.id) {
       setDetails(normalizeAssetDetails());
-      setError("");
+      setError("No asset selected.");
       return;
     }
 
@@ -92,27 +90,30 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
     };
 
     loadDetails();
-  }, [assetRecord, open]);
+  }, [assetRecord]);
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Stack spacing={1.5}>
-          <Typography variant="h6">
-            Asset Details {assetRecord?.id ? `#${assetRecord.id}` : ""}
-          </Typography>
-          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-            {assetRecord?.name ? <Chip label={`Name: ${assetRecord.name}`} color="primary" /> : null}
-            {assetRecord?.tag ? <Chip label={`Tag: ${assetRecord.tag}`} variant="outlined" /> : null}
-            {assetRecord?.owner ? <Chip label={`Owner: ${assetRecord.owner}`} variant="outlined" /> : null}
-          </Stack>
-        </Stack>
-      </DialogTitle>
-      <DialogContent dividers>
-        {loading && <LinearProgress sx={{ mb: 2 }} />}
-        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+    <Container maxWidth={false} sx={{ py: 3 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, flexGrow: 1 }}>
+          Asset Details {assetRecord?.id ? `#${assetRecord.id}` : ""}
+        </Typography>
+        {onBack ? (
+          <Chip label="Back" onClick={onBack} clickable color="primary" variant="outlined" />
+        ) : null}
+      </Stack>
 
-        {!loading && !error && (
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 3 }}>
+        {assetRecord?.name ? <Chip label={`Name: ${assetRecord.name}`} color="primary" /> : null}
+        {assetRecord?.tag ? <Chip label={`Tag: ${assetRecord.tag}`} variant="outlined" /> : null}
+        {assetRecord?.owner ? <Chip label={`Owner: ${assetRecord.owner}`} variant="outlined" /> : null}
+      </Stack>
+
+      {loading && <LinearProgress sx={{ mb: 2 }} />}
+      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
+
+      {!loading && !error && (
+        <Paper sx={{ p: 3 }}>
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -191,7 +192,7 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
                 Software
               </Typography>
               {details.software.length ? (
-                <List dense sx={{ maxHeight: 240, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                <List dense sx={{ maxHeight: 320, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
                   {details.software.map((item, index) => (
                     <ListItem key={`${item?.sw_name || "software"}-${index}`} divider>
                       <ListItemText
@@ -240,24 +241,23 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
               </Stack>
             </Box>
           </Stack>
-        )}
-      </DialogContent>
-    </Dialog>
+        </Paper>
+      )}
+    </Container>
   );
 }
 
-AssetDetailsModal.propTypes = {
+AssetDetailsPage.propTypes = {
   assetRecord: PropTypes.shape({
     id: PropTypes.number,
     name: PropTypes.string,
     tag: PropTypes.string,
     owner: PropTypes.string,
   }),
-  open: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
+  onBack: PropTypes.func,
 };
 
-function AssetsPage({ onSelectAsset }) {
+function AssetsPage({ onOpenDetails }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
@@ -340,7 +340,7 @@ function AssetsPage({ onSelectAsset }) {
           onSortModelChange={setSortModel}
           pageSizeOptions={[25, 50, 100]}
           disableRowSelectionOnClick
-          onRowClick={(params) => onSelectAsset(params.row)}
+          onRowClick={(params) => onOpenDetails(params.row)}
           sx={{
             bgcolor: "background.paper",
             cursor: "pointer",
@@ -355,10 +355,10 @@ function AssetsPage({ onSelectAsset }) {
 }
 
 AssetsPage.propTypes = {
-  onSelectAsset: PropTypes.func.isRequired,
+  onOpenDetails: PropTypes.func.isRequired,
 };
 
-function SoftwaresPage({ onSelectAsset }) {
+function SoftwaresPage({ onOpenDetails }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -423,9 +423,9 @@ function SoftwaresPage({ onSelectAsset }) {
           onRowClick={async (params) => {
             try {
               const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
-              onSelectAsset(response.data);
+              onOpenDetails(response.data);
             } catch {
-              onSelectAsset({ id: params.row.asset_id, name: "", tag: "", owner: "" });
+              onOpenDetails({ id: params.row.asset_id, name: "", tag: "", owner: "" });
             }
           }}
           sx={{
@@ -442,17 +442,43 @@ function SoftwaresPage({ onSelectAsset }) {
 }
 
 SoftwaresPage.propTypes = {
-  onSelectAsset: PropTypes.func.isRequired,
+  onOpenDetails: PropTypes.func.isRequired,
 };
 
 export default function App({ mode, onToggleColorMode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState("assets");
-  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [detailsAsset, setDetailsAsset] = useState(() => {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("view") !== "details") {
+        return null;
+      }
+
+      const stored = window.sessionStorage.getItem(DETAILS_PAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
     setMobileOpen(false);
+    if (window.location.search.includes("view=details")) {
+      window.history.replaceState({}, "", window.location.pathname);
+      setDetailsAsset(null);
+    }
+  };
+
+  const openDetailsInNewTab = (assetRecord) => {
+    try {
+      window.sessionStorage.setItem(DETAILS_PAGE_KEY, JSON.stringify(assetRecord));
+    } catch {
+      // ignore storage failure and still try to open details page
+    }
+
+    window.open(`${window.location.pathname}?view=details`, "_blank", "noopener,noreferrer");
   };
 
   const navigation = (
@@ -473,6 +499,29 @@ export default function App({ mode, onToggleColorMode }) {
       </List>
     </Box>
   );
+
+  if (detailsAsset) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
+        <AppBar position="sticky" color="default" elevation={1}>
+          <Toolbar sx={{ gap: 2 }}>
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+              Asset Details
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {mode === "dark" ? "Dark mode" : "Light mode"}
+            </Typography>
+            <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+              <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
+                {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+              </IconButton>
+            </Tooltip>
+          </Toolbar>
+        </AppBar>
+        <AssetDetailsPage assetRecord={detailsAsset} onBack={() => window.close()} />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -544,18 +593,12 @@ export default function App({ mode, onToggleColorMode }) {
 
         <Container maxWidth={false} sx={{ py: 3 }}>
           {currentPage === "assets" ? (
-            <AssetsPage onSelectAsset={setSelectedAsset} />
+            <AssetsPage onOpenDetails={openDetailsInNewTab} />
           ) : (
-            <SoftwaresPage onSelectAsset={setSelectedAsset} />
+            <SoftwaresPage onOpenDetails={openDetailsInNewTab} />
           )}
         </Container>
       </Box>
-
-      <AssetDetailsModal
-        assetRecord={selectedAsset}
-        open={Boolean(selectedAsset)}
-        onClose={() => setSelectedAsset(null)}
-      />
     </Box>
   );
 }
