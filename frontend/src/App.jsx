@@ -2,16 +2,18 @@ import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
-  Alert,
   Box,
   Chip,
   Container,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   Divider,
   Drawer,
   IconButton,
   LinearProgress,
   List,
-  ListItem,
+  ListItemButton,
   ListItemText,
   Paper,
   Stack,
@@ -27,30 +29,11 @@ import { DataGrid } from "@mui/x-data-grid";
 import { api } from "./api";
 
 const DRAWER_WIDTH = 240;
-const DETAILS_PAGE_KEY = "asset-portal-details-record";
-
-function normalizeAssetDetails(data) {
-  return {
-    asset_id: data?.asset_id ?? null,
-    alias: data?.alias ?? "",
-    kernel: data?.kernel ?? "",
-    os_name: data?.os_name ?? "",
-    os_family: data?.os_family ?? "",
-    os_arch: data?.os_arch ?? "",
-    code_name: data?.code_name ?? "",
-    cn_name: data?.cn_name ?? "",
-    vendor: data?.vendor ?? "",
-    product_name: data?.product_name ?? "",
-    software: Array.isArray(data?.software) ? data.software : [],
-    neighbour_ports: Array.isArray(data?.neighbour_ports) ? data.neighbour_ports : [],
-    ip_addresses: Array.isArray(data?.ip_addresses) ? data.ip_addresses : [],
-  };
-}
 
 function DetailRow({ label, value }) {
   return (
     <Box sx={{ py: 1 }}>
-      <Typography variant="caption" color="text.secondary">
+      <Typography variant="caption" color="text.secondary" display="block">
         {label}
       </Typography>
       <Typography variant="body1">{value || "-"}</Typography>
@@ -63,82 +46,76 @@ DetailRow.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
-function AssetDetailsPage({ assetRecord, onBack }) {
-  const [details, setDetails] = useState(normalizeAssetDetails());
+function AssetDetailsModal({ assetId, open, onClose }) {
+  const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null); // Track network errors
+  const [softwareFilter, setSoftwareFilter] = useState("");
 
   useEffect(() => {
-    if (!assetRecord?.id) {
-      setDetails(normalizeAssetDetails());
-      setError("No asset selected.");
+    if (!open || !assetId) {
+      setDetails(null);
+      setError(null);
+      setSoftwareFilter("");
       return;
     }
 
     const loadDetails = async () => {
       setLoading(true);
-      setError("");
+      setError(null);
       try {
-        const response = await api.get(`/api/v1/assets/${assetRecord.id}`);
-        setDetails(normalizeAssetDetails(response.data));
-      } catch (loadError) {
-        setDetails(normalizeAssetDetails());
-        setError(loadError?.response?.data?.detail || "Failed to load asset details.");
+        const response = await api.get(`/api/v1/assets/${assetId}`);
+        setDetails(response.data);
+        setSoftwareFilter("");
+      } catch (err) {
+        console.error("Error fetching asset details profile:", err);
+        setError("Failed to load asset details. Please try again.");
       } finally {
         setLoading(false);
       }
     };
 
     loadDetails();
-  }, [assetRecord]);
+  }, [assetId, open]);
+
+  const filteredSoftware = useMemo(() => {
+    if (!details?.software) return [];
+    const pattern = softwareFilter.trim().toLowerCase();
+    if (!pattern) return details.software;
+
+    return details.software.filter((item) => {
+      const name = item?.sw_name?.toLowerCase() || "";
+      const version = item?.sw_version?.toLowerCase() || "";
+      return name.includes(pattern) || version.includes(pattern);
+    });
+  }, [details, softwareFilter]);
 
   return (
-    <Container maxWidth={false} sx={{ py: 3 }}>
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ mb: 3 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, flexGrow: 1 }}>
-          Asset Details {assetRecord?.id ? `#${assetRecord.id}` : ""}
-        </Typography>
-        {onBack ? (
-          <Chip label="Back" onClick={onBack} clickable color="primary" variant="outlined" />
-        ) : null}
-      </Stack>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Asset Details {assetId ? `#${assetId}` : ""}</DialogTitle>
+      <DialogContent dividers>
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 3 }}>
-        {assetRecord?.name ? <Chip label={`Name: ${assetRecord.name}`} color="primary" /> : null}
-        {assetRecord?.tag ? <Chip label={`Tag: ${assetRecord.tag}`} variant="outlined" /> : null}
-        {assetRecord?.owner ? <Chip label={`Owner: ${assetRecord.owner}`} variant="outlined" /> : null}
-      </Stack>
+        {/* Display clear error messaging if API fails */}
+        {error && (
+          <Typography color="error" align="center" sx={{ py: 3 }}>
+            {error}
+          </Typography>
+        )}
 
-      {loading && <LinearProgress sx={{ mb: 2 }} />}
-      {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
-
-      {!loading && !error && (
-        <Paper sx={{ p: 3 }}>
+        {!loading && !error && details && (
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6" gutterBottom>
-                Hostname
+                Aliases
               </Typography>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
-                <Box sx={{ minWidth: 180, flex: 1 }}>
-                  <DetailRow label="Name" value={assetRecord?.name} />
-                </Box>
-                <Box sx={{ minWidth: 180, flex: 1 }}>
-                  <DetailRow label="Tag" value={assetRecord?.tag} />
-                </Box>
-                <Box sx={{ minWidth: 180, flex: 1 }}>
-                  <DetailRow label="Alias" value={details.alias} />
-                </Box>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                {details.aliases?.length ? (
+                  details.aliases.map((alias) => <Chip key={alias} label={alias} variant="outlined" />)
+                ) : (
+                  <Typography color="text.secondary">No aliases available.</Typography>
+                )}
               </Stack>
-            </Box>
-
-            <Divider />
-
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Ownership
-              </Typography>
-              <DetailRow label="Owner" value={assetRecord?.owner} />
             </Box>
 
             <Divider />
@@ -164,7 +141,7 @@ function AssetDetailsPage({ assetRecord, onBack }) {
                   <DetailRow label="Code Name" value={details.code_name} />
                 </Box>
                 <Box sx={{ minWidth: 180, flex: 1 }}>
-                  <DetailRow label="Common Name" value={details.cn_name} />
+                  <DetailRow label="CPE Name" value={details.cpe_name} />
                 </Box>
               </Stack>
             </Box>
@@ -188,22 +165,32 @@ function AssetDetailsPage({ assetRecord, onBack }) {
             <Divider />
 
             <Box>
-              <Typography variant="h6" gutterBottom>
-                Software
-              </Typography>
-              {details.software.length ? (
-                <List dense sx={{ maxHeight: 320, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                  {details.software.map((item, index) => (
+              <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 1 }}>
+                <Typography variant="h6">Software</Typography>
+                <TextField
+                  size="small"
+                  label="Filter software"
+                  value={softwareFilter}
+                  onChange={(e) => setSoftwareFilter(e.target.value)}
+                  sx={{ minWidth: { xs: "100%", sm: 260 } }}
+                />
+              </Stack>
+              {filteredSoftware.length ? (
+                <List dense sx={{ maxHeight: 240, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                  {filteredSoftware.map((item, index) => (
                     <ListItem key={`${item?.sw_name || "software"}-${index}`} divider>
                       <ListItemText
-                        primary={item?.sw_name || "-"}
-                        secondary={item?.sw_version || "Version unknown"}
+                        primary={`${item?.sw_name || "-"} ${item?.sw_version ? `(${item.sw_version})` : ""}`.trim()}
                       />
                     </ListItem>
                   ))}
                 </List>
               ) : (
-                <Typography color="text.secondary">No software information available.</Typography>
+                <Typography color="text.secondary">
+                  {details.software?.length
+                    ? "No software matches the current filter."
+                    : "No software information available."}
+                </Typography>
               )}
             </Box>
 
@@ -211,15 +198,19 @@ function AssetDetailsPage({ assetRecord, onBack }) {
 
             <Box>
               <Typography variant="h6" gutterBottom>
-                Network Neighbour Ports
+                Network Neighbours
               </Typography>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {details.neighbour_ports.length ? (
-                  details.neighbour_ports.map((port, index) => (
-                    <Chip key={`${port || "port"}-${index}`} label={port || "-"} variant="outlined" />
+                {details.neighbour_ports?.length ? (
+                  details.neighbour_ports.map((item, index) => (
+                    <Chip
+                      key={`${item?.network_device || "device"}-${item?.local_port || "local"}-${item?.neighbour_port || index}`}
+                      label={`${item?.network_device || "Unknown device"} · ${item?.local_port || "?"} → ${item?.neighbour_port || "?"}`}
+                      variant="outlined"
+                    />
                   ))
                 ) : (
-                  <Typography color="text.secondary">No neighbour ports available.</Typography>
+                  <Typography color="text.secondary">No network neighbour information available.</Typography>
                 )}
               </Stack>
             </Box>
@@ -231,42 +222,47 @@ function AssetDetailsPage({ assetRecord, onBack }) {
                 IP Addresses
               </Typography>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {details.ip_addresses.length ? (
-                  details.ip_addresses.map((ip, index) => (
-                    <Chip key={`${ip || "ip"}-${index}`} label={ip || "-"} variant="outlined" />
-                  ))
+                {details.ip_addresses?.length ? (
+                  details.ip_addresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />)
                 ) : (
                   <Typography color="text.secondary">No IP addresses available.</Typography>
                 )}
               </Stack>
             </Box>
           </Stack>
-        </Paper>
-      )}
-    </Container>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
-AssetDetailsPage.propTypes = {
+AssetDetailsModal.propTypes = {
   assetRecord: PropTypes.shape({
     id: PropTypes.number,
     name: PropTypes.string,
     tag: PropTypes.string,
     owner: PropTypes.string,
   }),
-  onBack: PropTypes.func,
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
 };
 
-function AssetsPage({ onOpenDetails }) {
+function AssetsPage({ onSelectAsset }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
-  const [paginationModel, setPaginationModel] = useState({
-    page: 0,
-    pageSize: 50,
-  });
+  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [sortModel, setSortModel] = useState([{ field: "id", sort: "asc" }]);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce logic for server-side search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   const columns = useMemo(
     () => [
@@ -297,19 +293,21 @@ function AssetsPage({ onOpenDetails }) {
             page_size: paginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: search || undefined,
+            search: debouncedSearch || undefined,
           },
         });
 
-        setRows(Array.isArray(response.data?.items) ? response.data.items : []);
-        setRowCount(Number(response.data?.total) || 0);
+        setRows(response.data.items || []);
+        setRowCount(response.data.total || 0);
+      } catch (error) {
+        console.error("Failed to load assets:", error);
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, [paginationModel, sortModel, search]);
+  }, [paginationModel, sortModel, debouncedSearch]);
 
   return (
     <>
@@ -340,13 +338,11 @@ function AssetsPage({ onOpenDetails }) {
           onSortModelChange={setSortModel}
           pageSizeOptions={[25, 50, 100]}
           disableRowSelectionOnClick
-          onRowClick={(params) => onOpenDetails(params.row)}
+          onRowClick={(params) => onSelectAsset(params.row)}
           sx={{
             bgcolor: "background.paper",
             cursor: "pointer",
-            '& .MuiDataGrid-columnHeaders': {
-              bgcolor: "background.paper",
-            },
+            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
           }}
         />
       </Paper>
@@ -355,13 +351,21 @@ function AssetsPage({ onOpenDetails }) {
 }
 
 AssetsPage.propTypes = {
-  onOpenDetails: PropTypes.func.isRequired,
+  onSelectAsset: PropTypes.func.isRequired,
 };
 
-function SoftwaresPage({ onOpenDetails }) {
+function SoftwaresPage({ onSelectAsset }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   const columns = useMemo(
     () => [
@@ -378,30 +382,39 @@ function SoftwaresPage({ onOpenDetails }) {
       setLoading(true);
       try {
         const response = await api.get("/api/v1/software", {
-          params: {
-            search: search || undefined,
-          },
+          params: { search: debouncedSearch || undefined },
         });
 
-        const items = Array.isArray(response.data?.items)
-          ? response.data.items
-          : Array.isArray(response.data)
-            ? response.data
-            : [];
-
+        const items = response.data.items || response.data || [];
         setRows(
           items.map((item, index) => ({
-            id: `${item?.asset_id || "asset"}-${item?.sw_name || index}`,
+            id: `${item.asset_id}-${item.sw_name || index}`,
             ...item,
           }))
         );
+      } catch (error) {
+        console.error("Failed to load software packages:", error);
       } finally {
         setLoading(false);
       }
     };
 
     load();
-  }, [search]);
+  }, [debouncedSearch]);
+
+  const handleRowClick = async (params) => {
+    try {
+      const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
+      // Explicitly normalize payload structure ensuring an active 'id' key exists for the modal's effect hooks
+      const assetData = {
+        id: params.row.asset_id,
+        ...response.data
+      };
+      onSelectAsset(assetData);
+    } catch (error) {
+      console.error("Failed to fetch asset summary details:", error);
+    }
+  };
 
   return (
     <>
@@ -420,20 +433,11 @@ function SoftwaresPage({ onOpenDetails }) {
           columns={columns}
           loading={loading}
           disableRowSelectionOnClick
-          onRowClick={async (params) => {
-            try {
-              const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
-              onOpenDetails(response.data);
-            } catch {
-              onOpenDetails({ id: params.row.asset_id, name: "", tag: "", owner: "" });
-            }
-          }}
+          onRowClick={handleRowClick}
           sx={{
             bgcolor: "background.paper",
             cursor: "pointer",
-            '& .MuiDataGrid-columnHeaders': {
-              bgcolor: "background.paper",
-            },
+            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
           }}
         />
       </Paper>
@@ -442,43 +446,17 @@ function SoftwaresPage({ onOpenDetails }) {
 }
 
 SoftwaresPage.propTypes = {
-  onOpenDetails: PropTypes.func.isRequired,
+  onSelectAsset: PropTypes.func.isRequired,
 };
 
 export default function App({ mode, onToggleColorMode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState("assets");
-  const [detailsAsset, setDetailsAsset] = useState(() => {
-    try {
-      const searchParams = new URLSearchParams(window.location.search);
-      if (searchParams.get("view") !== "details") {
-        return null;
-      }
-
-      const stored = window.sessionStorage.getItem(DETAILS_PAGE_KEY);
-      return stored ? JSON.parse(stored) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [selectedAsset, setSelectedAsset] = useState(null);
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
     setMobileOpen(false);
-    if (window.location.search.includes("view=details")) {
-      window.history.replaceState({}, "", window.location.pathname);
-      setDetailsAsset(null);
-    }
-  };
-
-  const openDetailsInNewTab = (assetRecord) => {
-    try {
-      window.sessionStorage.setItem(DETAILS_PAGE_KEY, JSON.stringify(assetRecord));
-    } catch {
-      // ignore storage failure and still try to open details page
-    }
-
-    window.open(`${window.location.pathname}?view=details`, "_blank", "noopener,noreferrer");
   };
 
   const navigation = (
@@ -490,48 +468,18 @@ export default function App({ mode, onToggleColorMode }) {
       </Toolbar>
       <Divider />
       <List>
-        <ListItem button selected={currentPage === "assets"} onClick={() => handleNavigate("assets")}>
+        <ListItemButton selected={currentPage === "assets"} onClick={() => handleNavigate("assets")}>
           <ListItemText primary="Assets" />
-        </ListItem>
-        <ListItem button selected={currentPage === "softwares"} onClick={() => handleNavigate("softwares")}>
+        </ListItemButton>
+        <ListItemButton selected={currentPage === "softwares"} onClick={() => handleNavigate("softwares")}>
           <ListItemText primary="Softwares" />
-        </ListItem>
+        </ListItemButton>
       </List>
     </Box>
   );
 
-  if (detailsAsset) {
-    return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
-        <AppBar position="sticky" color="default" elevation={1}>
-          <Toolbar sx={{ gap: 2 }}>
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-              Asset Details
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {mode === "dark" ? "Dark mode" : "Light mode"}
-            </Typography>
-            <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-              <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
-                {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
-            </Tooltip>
-          </Toolbar>
-        </AppBar>
-        <AssetDetailsPage assetRecord={detailsAsset} onBack={() => window.close()} />
-      </Box>
-    );
-  }
-
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: "background.default",
-        color: "text.primary",
-        display: "flex",
-      }}
-    >
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary", display: "flex" }}>
       <Drawer
         variant="temporary"
         open={mobileOpen}
@@ -552,7 +500,6 @@ export default function App({ mode, onToggleColorMode }) {
           '& .MuiDrawer-paper': {
             boxSizing: "border-box",
             width: DRAWER_WIDTH,
-            position: "relative",
           },
         }}
         open
@@ -560,12 +507,12 @@ export default function App({ mode, onToggleColorMode }) {
         {navigation}
       </Drawer>
 
-      <Box sx={{ flexGrow: 1 }}>
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
           position="sticky"
           color="default"
           elevation={1}
-          sx={{ width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, ml: { md: `${DRAWER_WIDTH}px` } }}
+          sx={{ width: "100%" }}
         >
           <Toolbar sx={{ gap: 2 }}>
             <IconButton
@@ -591,14 +538,20 @@ export default function App({ mode, onToggleColorMode }) {
           </Toolbar>
         </AppBar>
 
-        <Container maxWidth={false} sx={{ py: 3 }}>
+        <Container maxWidth={false} sx={{ py: 3, flexGrow: 1 }}>
           {currentPage === "assets" ? (
-            <AssetsPage onOpenDetails={openDetailsInNewTab} />
+            <AssetsPage onSelectAsset={setSelectedAsset} />
           ) : (
-            <SoftwaresPage onOpenDetails={openDetailsInNewTab} />
+            <SoftwaresPage onSelectAsset={setSelectedAsset} />
           )}
         </Container>
       </Box>
+
+      <AssetDetailsModal
+        assetRecord={selectedAsset}
+        open={Boolean(selectedAsset)}
+        onClose={() => setSelectedAsset(null)}
+      />
     </Box>
   );
 }
