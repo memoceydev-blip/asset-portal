@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
+  Alert,
   Box,
   Chip,
   Container,
@@ -13,7 +14,7 @@ import {
   IconButton,
   LinearProgress,
   List,
-  ListItemButton,
+  ListItem,
   ListItemText,
   Paper,
   Stack,
@@ -30,6 +31,24 @@ import { api } from "./api";
 
 const DRAWER_WIDTH = 240;
 
+function normalizeAssetDetails(data) {
+  return {
+    asset_id: data?.asset_id ?? null,
+    alias: data?.alias ?? "",
+    kernel: data?.kernel ?? "",
+    os_name: data?.os_name ?? "",
+    os_family: data?.os_family ?? "",
+    os_arch: data?.os_arch ?? "",
+    code_name: data?.code_name ?? "",
+    cn_name: data?.cn_name ?? "",
+    vendor: data?.vendor ?? "",
+    product_name: data?.product_name ?? "",
+    software: Array.isArray(data?.software) ? data.software : [],
+    neighbour_ports: Array.isArray(data?.neighbour_ports) ? data.neighbour_ports : [],
+    ip_addresses: Array.isArray(data?.ip_addresses) ? data.ip_addresses : [],
+  };
+}
+
 function DetailRow({ label, value }) {
   return (
     <Box sx={{ py: 1 }}>
@@ -43,24 +62,30 @@ function DetailRow({ label, value }) {
 
 DetailRow.propTypes = {
   label: PropTypes.string.isRequired,
-  value: PropTypes.string,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
 function AssetDetailsModal({ assetRecord, open, onClose }) {
-  const [details, setDetails] = useState(null);
+  const [details, setDetails] = useState(normalizeAssetDetails());
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open || !assetRecord?.id) {
-      setDetails(null);
+      setDetails(normalizeAssetDetails());
+      setError("");
       return;
     }
 
     const loadDetails = async () => {
       setLoading(true);
+      setError("");
       try {
         const response = await api.get(`/api/v1/assets/${assetRecord.id}`);
-        setDetails(response.data);
+        setDetails(normalizeAssetDetails(response.data));
+      } catch (loadError) {
+        setDetails(normalizeAssetDetails());
+        setError(loadError?.response?.data?.detail || "Failed to load asset details.");
       } finally {
         setLoading(false);
       }
@@ -85,8 +110,9 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
       </DialogTitle>
       <DialogContent dividers>
         {loading && <LinearProgress sx={{ mb: 2 }} />}
+        {error ? <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert> : null}
 
-        {!loading && details && (
+        {!loading && !error && (
           <Stack spacing={3}>
             <Box>
               <Typography variant="h6" gutterBottom>
@@ -167,12 +193,12 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
               {details.software.length ? (
                 <List dense sx={{ maxHeight: 240, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
                   {details.software.map((item, index) => (
-                    <ListItemButton key={`${item.sw_name || "software"}-${index}`} disableRipple>
+                    <ListItem key={`${item?.sw_name || "software"}-${index}`} divider>
                       <ListItemText
-                        primary={item.sw_name || "-"}
-                        secondary={item.sw_version || "Version unknown"}
+                        primary={item?.sw_name || "-"}
+                        secondary={item?.sw_version || "Version unknown"}
                       />
-                    </ListItemButton>
+                    </ListItem>
                   ))}
                 </List>
               ) : (
@@ -188,7 +214,9 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
               </Typography>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {details.neighbour_ports.length ? (
-                  details.neighbour_ports.map((port) => <Chip key={port} label={port} variant="outlined" />)
+                  details.neighbour_ports.map((port, index) => (
+                    <Chip key={`${port || "port"}-${index}`} label={port || "-"} variant="outlined" />
+                  ))
                 ) : (
                   <Typography color="text.secondary">No neighbour ports available.</Typography>
                 )}
@@ -203,7 +231,9 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
               </Typography>
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {details.ip_addresses.length ? (
-                  details.ip_addresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />)
+                  details.ip_addresses.map((ip, index) => (
+                    <Chip key={`${ip || "ip"}-${index}`} label={ip || "-"} variant="outlined" />
+                  ))
                 ) : (
                   <Typography color="text.secondary">No IP addresses available.</Typography>
                 )}
@@ -271,8 +301,8 @@ function AssetsPage({ onSelectAsset }) {
           },
         });
 
-        setRows(response.data.items);
-        setRowCount(response.data.total);
+        setRows(Array.isArray(response.data?.items) ? response.data.items : []);
+        setRowCount(Number(response.data?.total) || 0);
       } finally {
         setLoading(false);
       }
@@ -353,10 +383,15 @@ function SoftwaresPage({ onSelectAsset }) {
           },
         });
 
-        const items = response.data.items || response.data;
+        const items = Array.isArray(response.data?.items)
+          ? response.data.items
+          : Array.isArray(response.data)
+            ? response.data
+            : [];
+
         setRows(
           items.map((item, index) => ({
-            id: `${item.asset_id}-${item.sw_name || index}`,
+            id: `${item?.asset_id || "asset"}-${item?.sw_name || index}`,
             ...item,
           }))
         );
@@ -386,8 +421,12 @@ function SoftwaresPage({ onSelectAsset }) {
           loading={loading}
           disableRowSelectionOnClick
           onRowClick={async (params) => {
-            const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
-            onSelectAsset(response.data);
+            try {
+              const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
+              onSelectAsset(response.data);
+            } catch {
+              onSelectAsset({ id: params.row.asset_id, name: "", tag: "", owner: "" });
+            }
           }}
           sx={{
             bgcolor: "background.paper",
@@ -425,12 +464,12 @@ export default function App({ mode, onToggleColorMode }) {
       </Toolbar>
       <Divider />
       <List>
-        <ListItemButton selected={currentPage === "assets"} onClick={() => handleNavigate("assets")}>
+        <ListItem button selected={currentPage === "assets"} onClick={() => handleNavigate("assets")}>
           <ListItemText primary="Assets" />
-        </ListItemButton>
-        <ListItemButton selected={currentPage === "softwares"} onClick={() => handleNavigate("softwares")}>
+        </ListItem>
+        <ListItem button selected={currentPage === "softwares"} onClick={() => handleNavigate("softwares")}>
           <ListItemText primary="Softwares" />
-        </ListItemButton>
+        </ListItem>
       </List>
     </Box>
   );
