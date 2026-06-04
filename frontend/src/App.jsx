@@ -338,7 +338,7 @@ function AssetsPage({ onSelectAsset }) {
           onSortModelChange={setSortModel}
           pageSizeOptions={[25, 50, 100]}
           disableRowSelectionOnClick
-          onRowClick={(params) => onSelectAsset(params.row)}
+          onRowClick={(params) => setSelectedAssetId(params.row.id)}
           sx={{
             bgcolor: "background.paper",
             cursor: "pointer",
