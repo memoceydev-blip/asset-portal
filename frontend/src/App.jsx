@@ -109,7 +109,55 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>Asset Details {assetId ? `#${assetId}` : ""}</DialogTitle>
+      <DialogTitle 
+        sx={{ 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2
+        }}
+      >
+        <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+          Asset Details {assetId ? `#${assetId}` : ""}
+        </Typography>
+
+        {/* New inline contextual meta details row placed strictly to the right side */}
+        {!loading && details && (
+          <Stack 
+            direction="row" 
+            spacing={1.5} 
+            alignItems="center" 
+            sx={{ marginLeft: "auto" }}
+          >
+            {details.name && (
+              <Chip 
+                label={`Name: ${details.name}`} 
+                size="small" 
+                color="primary" 
+                variant="outlined" 
+              />
+            )}
+            {details.tag && (
+              <Chip 
+                label={`Tag: ${details.tag}`} 
+                size="small" 
+                color="secondary" 
+                variant="outlined" 
+              />
+            )}
+            {details.owner && (
+              <Chip 
+                label={`Owner: ${details.owner}`} 
+                size="small" 
+                variant="filled"
+                sx={{ bgcolor: "action.selected" }} 
+              />
+            )}
+          </Stack>
+        )}
+      </DialogTitle>
+      
       <DialogContent dividers>
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
@@ -267,7 +315,7 @@ export default function App({ mode, onToggleColorMode }) {
   const [selectedAssetId, setSelectedAssetId] = useState(null);
 
   // ------------------------------------------
-  // ASSETS VIEW STATE & EFFECTS (Restored to General Global Search)
+  // ASSETS VIEW STATE & EFFECTS
   // ------------------------------------------
   const [assetRows, setAssetRows] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
@@ -316,7 +364,7 @@ export default function App({ mode, onToggleColorMode }) {
             page_size: assetPaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: debouncedAssetSearch || undefined, // Uses single general parameter
+            search: debouncedAssetSearch || undefined,
           },
         });
 
@@ -337,7 +385,7 @@ export default function App({ mode, onToggleColorMode }) {
   }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
 
   // ------------------------------------------
-  // SOFTWARES VIEW STATE & EFFECTS (Maintains Split-Column Search Matrix)
+  // SOFTWARES VIEW STATE & EFFECTS
   // ------------------------------------------
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
@@ -467,146 +515,4 @@ export default function App({ mode, onToggleColorMode }) {
             <ListItem disablePadding>
               <ListItemButton 
                 selected={currentView === "softwares"} 
-                onClick={() => setCurrentView("softwares")}
-              >
-                <ListItemIcon>
-                  <SettingsApplicationsIcon />
-                </ListItemIcon>
-                <ListItemText primary="Softwares" />
-              </ListItemButton>
-            </ListItem>
-          </List>
-        </Box>
-      </Drawer>
-
-      {/* Main Container */}
-      <Container maxWidth={false} sx={{ py: 3 }}>
-        
-        {/* VIEW 1: ASSETS (Restored to 1 Global Search Box) */}
-        {currentView === "assets" && (
-          <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-              <TextField
-                fullWidth
-                label="Search Assets"
-                value={assetSearch}
-                onChange={(e) => {
-                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                  setAssetSearch(e.target.value);
-                }}
-              />
-            </Paper>
-
-            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-              <DataGrid
-                rows={assetRows}
-                columns={assetColumns}
-                loading={assetLoading}
-                rowCount={assetRowCount}
-                pagination
-                paginationMode="server"
-                sortingMode="server"
-                paginationModel={assetPaginationModel}
-                onPaginationModelChange={setAssetPaginationModel}
-                sortModel={assetSortModel}
-                onSortModelChange={setAssetSortModel}
-                pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
-                onRowClick={(params) => setSelectedAssetId(params.row.id)}
-                sx={{
-                  bgcolor: "background.paper",
-                  cursor: "pointer",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                }}
-              />
-            </Paper>
-          </>
-        )}
-
-        {/* VIEW 2: SOFTWARES (Has Individual Name, Version, OS, Owner Row Filters) */}
-        {currentView === "softwares" && (
-          <>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                  size="small"
-                  label="Search Name"
-                  value={swSearchName}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchName(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search Version"
-                  value={swSearchVersion}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchVersion(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search OS"
-                  value={swSearchOS}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchOS(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search Owner"
-                  value={swSearchOwner}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchOwner(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
-            </Paper>
-
-            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-              <DataGrid
-                rows={softwareRows}
-                columns={softwareColumns}
-                loading={softwareLoading}
-                rowCount={softwareRowCount}
-                pagination
-                paginationMode="server"
-                sortingMode="server"
-                paginationModel={softwarePaginationModel}
-                onPaginationModelChange={setSoftwarePaginationModel}
-                sortModel={softwareSortModel}
-                onSortModelChange={setSoftwareSortModel}
-                pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
-                sx={{
-                  bgcolor: "background.paper",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                }}
-              />
-            </Paper>
-          </>
-        )}
-      </Container>
-
-      {/* Shared details modal overlay inspector panels */}
-      <AssetDetailsModal
-        assetId={selectedAssetId}
-        open={Boolean(selectedAssetId)}
-        onClose={() => setSelectedAssetId(null)}
-      />
-    </Box>
-  );
-}
-
-App.propTypes = {
-  mode: PropTypes.oneOf(["light", "dark"]).isRequired,
-  onToggleColorMode: PropTypes.func.isRequired,
-};
+                onClick={() => setCurrentView("soft
