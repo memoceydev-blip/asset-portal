@@ -325,7 +325,7 @@ export default function App({ mode, onToggleColorMode }) {
       } catch (error) {
         if (axios.isCancel(error) || error.name === "CanceledError") return;
         console.error("Error loading master assets list:", error);
-      } finaly {
+      } finally {
         // Safe check to avoid flickering states on cancelled request blocks
         if (!controller.signal.aborted) {
           setAssetLoading(false);
