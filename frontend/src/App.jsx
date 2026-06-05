@@ -30,6 +30,7 @@ import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import { DataGrid } from "@mui/x-data-grid";
+import axios from "axios"; // Added explicit check for axios cancellation helpers
 import { api } from "./api";
 
 // ==========================================
@@ -68,14 +69,20 @@ function AssetDetailsModal({ assetId, open, onClose }) {
       return;
     }
 
+    // Abort controller ensures modal fetches don't overlap if user switches rows quickly
+    const controller = new AbortController();
+
     const loadDetails = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get(`/api/v1/assets/${assetId}`);
+        const response = await api.get(`/api/v1/assets/${assetId}`, {
+          signal: controller.signal,
+        });
         setDetails(response.data);
         setSoftwareFilter("");
       } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
         console.error("Error fetching asset details profile:", err);
         setError("Failed to load asset details. Please try again.");
       } finally {
@@ -84,6 +91,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
     };
 
     loadDetails();
+    return () => controller.abort();
   }, [assetId, open]);
 
   const filteredSoftware = useMemo(() => {
@@ -253,11 +261,8 @@ AssetDetailsModal.propTypes = {
 // COMPONENT: Main App Layout & View Router
 // ==========================================
 export default function App({ mode, onToggleColorMode }) {
-  // Navigation State
   const [currentView, setCurrentView] = useState("assets");
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // Shared Modals State
   const [selectedAssetId, setSelectedAssetId] = useState(null);
 
   // ------------------------------------------
@@ -295,6 +300,9 @@ export default function App({ mode, onToggleColorMode }) {
   useEffect(() => {
     if (currentView !== "assets") return;
 
+    // Build abort token instance to prevent query race-overwriting condition blocks
+    const controller = new AbortController();
+
     const loadAssets = async () => {
       setAssetLoading(true);
       try {
@@ -302,6 +310,7 @@ export default function App({ mode, onToggleColorMode }) {
         const sortDir = assetSortModel[0]?.sort || "asc";
 
         const response = await api.get("/api/v1/assets", {
+          signal: controller.signal,
           params: {
             page: assetPaginationModel.page + 1,
             page_size: assetPaginationModel.pageSize,
@@ -314,13 +323,18 @@ export default function App({ mode, onToggleColorMode }) {
         setAssetRows(response.data?.items || []);
         setAssetRowCount(response.data?.total || 0);
       } catch (error) {
+        if (axios.isCancel(error) || error.name === "CanceledError") return;
         console.error("Error loading master assets list:", error);
-      } finally {
-        setAssetLoading(false);
+      } finaly {
+        // Safe check to avoid flickering states on cancelled request blocks
+        if (!controller.signal.aborted) {
+          setAssetLoading(false);
+        }
       }
     };
 
     loadAssets();
+    return () => controller.abort();
   }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
 
   // ------------------------------------------
@@ -339,19 +353,23 @@ export default function App({ mode, onToggleColorMode }) {
     return () => clearTimeout(delayHandler);
   }, [softwareSearch]);
 
-  // The 'id' column is completely omitted from columns array so it stays hidden from human eyes
+  // Added requested human-friendly "Owner" layout attribute field
   const softwareColumns = useMemo(
     () => [
       { field: "asset", headerName: "Asset", flex: 1 },
       { field: "name", headerName: "Name", flex: 1.5 },
       { field: "version", headerName: "Version", flex: 1 },
       { field: "os", headerName: "OS", flex: 1.2 },
+      { field: "owner", headerName: "Owner", flex: 1.1 }, 
     ],
     []
   );
 
   useEffect(() => {
     if (currentView !== "softwares") return;
+
+    // Cancel old data grid requests immediately when user modifications hit hook arrays
+    const controller = new AbortController();
 
     const loadSoftwares = async () => {
       setSoftwareLoading(true);
@@ -360,6 +378,7 @@ export default function App({ mode, onToggleColorMode }) {
         const sortDir = softwareSortModel[0]?.sort || "asc";
 
         const response = await api.get("/api/v1/softwares", {
+          signal: controller.signal,
           params: {
             page: softwarePaginationModel.page + 1,
             page_size: softwarePaginationModel.pageSize,
@@ -369,17 +388,20 @@ export default function App({ mode, onToggleColorMode }) {
           },
         });
 
-        // Binds straight to your backend items payload containing the database 'id' fields
         setSoftwareRows(response.data?.items || []);
         setSoftwareRowCount(response.data?.total || 0);
       } catch (error) {
+        if (axios.isCancel(error) || error.name === "CanceledError") return;
         console.error("Error loading master software profiles:", error);
       } finally {
-        setSoftwareLoading(false);
+        if (!controller.signal.aborted) {
+          setSoftwareLoading(false);
+        }
       }
     };
 
     loadSoftwares();
+    return () => controller.abort();
   }, [softwarePaginationModel, softwareSortModel, debouncedSoftwareSearch, currentView]);
 
   return (
@@ -411,7 +433,7 @@ export default function App({ mode, onToggleColorMode }) {
         </Toolbar>
       </AppBar>
 
-      {/* Navigation Menu Modal Panel */}
+      {/* Drawer Panel Menu */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 250 }} role="presentation" onClick={() => setDrawerOpen(false)}>
           <Typography variant="h6" sx={{ p: 2, fontWeight: 600 }}>
@@ -445,7 +467,7 @@ export default function App({ mode, onToggleColorMode }) {
         </Box>
       </Drawer>
 
-      {/* Primary Dashboard Panel Content Layout */}
+      {/* Main Panel Content Workspace container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
         
         {/* VIEW 1: ASSETS */}
@@ -529,7 +551,7 @@ export default function App({ mode, onToggleColorMode }) {
         )}
       </Container>
 
-      {/* Global Details Profile Modal Inspector */}
+      {/* Shared Asset Details Modal */}
       <AssetDetailsModal
         assetId={selectedAssetId}
         open={Boolean(selectedAssetId)}
