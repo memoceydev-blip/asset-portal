@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Box,
+  Card,
+  CardContent,
   Chip,
   Container,
   Dialog,
@@ -10,6 +12,7 @@ import {
   DialogTitle,
   Divider,
   Drawer,
+  Grid,
   IconButton,
   LinearProgress,
   List,
@@ -27,9 +30,11 @@ import {
 import MenuIcon from "@mui/icons-material/Menu";
 import ComputerIcon from "@mui/icons-material/Computer";
 import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
+import DashboardIcon from "@mui/icons-material/Dashboard";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import { DataGrid } from "@mui/x-data-grid";
+import { PieChart } from "@mui/x-charts/PieChart";
 import axios from "axios";
 import { api } from "./api";
 
@@ -123,36 +128,10 @@ function AssetDetailsModal({ assetId, open, onClose }) {
         </Typography>
 
         {!loading && details && (
-          <Stack 
-            direction="row" 
-            spacing={1.5} 
-            alignItems="center" 
-            sx={{ marginLeft: "auto" }}
-          >
-            {details.name && (
-              <Chip 
-                label={`Name: ${details.name}`} 
-                size="small" 
-                color="primary" 
-                variant="outlined" 
-              />
-            )}
-            {details.tag && (
-              <Chip 
-                label={`Tag: ${details.tag}`} 
-                size="small" 
-                color="secondary" 
-                variant="outlined" 
-              />
-            )}
-            {details.owner && (
-              <Chip 
-                label={`Owner: ${details.owner}`} 
-                size="small" 
-                variant="filled"
-                sx={{ bgcolor: "action.selected" }} 
-              />
-            )}
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ marginLeft: "auto" }}>
+            {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
+            {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
+            {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
           </Stack>
         )}
       </DialogTitle>
@@ -250,9 +229,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 </List>
               ) : (
                 <Typography color="text.secondary">
-                  {details.software?.length
-                    ? "No software matches the current filter."
-                    : "No software information available."}
+                  {details.software?.length ? "No software matches the current filter." : "No software information available."}
                 </Typography>
               )}
             </Box>
@@ -309,9 +286,51 @@ AssetDetailsModal.propTypes = {
 // COMPONENT: Main App Layout & View Router
 // ==========================================
 export default function App({ mode, onToggleColorMode }) {
-  const [currentView, setCurrentView] = useState("assets");
+  // Default to the new summary panel view
+  const [currentView, setCurrentView] = useState("summary");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
+
+  // ------------------------------------------
+  // SUMMARY / STATS STATE & EFFECTS
+  // ------------------------------------------
+  const [osStats, setOsStats] = useState([]);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [statsError, setStatsError] = useState(null);
+
+  useEffect(() => {
+    if (currentView !== "summary") return;
+
+    const controller = new AbortController();
+    const loadStats = async () => {
+      setStatsLoading(true);
+      setStatsError(null);
+      try {
+        const response = await api.get("/api/v1/stats/os", {
+          signal: controller.signal,
+        });
+        // Transform incoming items structure (name, count) to MUI Chart syntax schema structure (id, value, label)
+        const items = response.data?.items || [];
+        const formattedData = items.map((item, index) => ({
+          id: index,
+          value: item.count,
+          label: item.name || "Unknown OS",
+        }));
+        setOsStats(formattedData);
+      } catch (error) {
+        if (axios.isCancel(error) || error.name === "CanceledError") return;
+        console.error("Error loading OS distribution statistics metrics:", error);
+        setStatsError("Failed to load metrics summaries.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setStatsLoading(false);
+        }
+      }
+    };
+
+    loadStats();
+    return () => controller.abort();
+  }, [currentView]);
 
   // ------------------------------------------
   // ASSETS VIEW STATE & EFFECTS
@@ -349,7 +368,6 @@ export default function App({ mode, onToggleColorMode }) {
     if (currentView !== "assets") return;
 
     const controller = new AbortController();
-
     const loadAssets = async () => {
       setAssetLoading(true);
       try {
@@ -426,7 +444,6 @@ export default function App({ mode, onToggleColorMode }) {
     if (currentView !== "softwares") return;
 
     const controller = new AbortController();
-
     const loadSoftwares = async () => {
       setSoftwareLoading(true);
       try {
@@ -468,17 +485,14 @@ export default function App({ mode, onToggleColorMode }) {
       {/* Top App Bar */}
       <AppBar position="sticky" color="default" elevation={1}>
         <Toolbar sx={{ gap: 2 }}>
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="open navigation menu"
-          >
+          <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} aria-label="open navigation menu">
             <MenuIcon />
           </IconButton>
           
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-            {currentView === "assets" ? "Asset Master" : "Softwares Inventory"}
+            {currentView === "summary" && "Infrastructure Metrics"}
+            {currentView === "assets" && "Asset Master"}
+            {currentView === "softwares" && "Softwares Inventory"}
           </Typography>
 
           <Typography variant="body2" color="text.secondary">
@@ -501,24 +515,20 @@ export default function App({ mode, onToggleColorMode }) {
           <Divider />
           <List>
             <ListItem disablePadding>
-              <ListItemButton 
-                selected={currentView === "assets"} 
-                onClick={() => setCurrentView("assets")}
-              >
-                <ListItemIcon>
-                  <ComputerIcon />
-                </ListItemIcon>
+              <ListItemButton selected={currentView === "summary"} onClick={() => setCurrentView("summarypanel" && "summary")}>
+                <ListItemIcon><DashboardIcon /></ListItemIcon>
+                <ListItemText primary="Summary" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton selected={currentView === "assets"} onClick={() => setCurrentView("assets")}>
+                <ListItemIcon><ComputerIcon /></ListItemIcon>
                 <ListItemText primary="Assets" />
               </ListItemButton>
             </ListItem>
             <ListItem disablePadding>
-              <ListItemButton 
-                selected={currentView === "softwares"} 
-                onClick={() => setCurrentView("softwares")}
-              >
-                <ListItemIcon>
-                  <SettingsApplicationsIcon />
-                </ListItemIcon>
+              <ListItemButton selected={currentView === "softwares"} onClick={() => setCurrentView("softwares")}>
+                <ListItemIcon><SettingsApplicationsIcon /></ListItemIcon>
                 <ListItemText primary="Softwares" />
               </ListItemButton>
             </ListItem>
@@ -528,6 +538,72 @@ export default function App({ mode, onToggleColorMode }) {
 
       {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
+        
+        {/* VIEW 0: DASHBOARD SUMMARY PANEL */}
+        {currentView === "summary" && (
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6} lg={5}>
+              <Card sx={{ bgcolor: "background.paper", minHeight: 400 }}>
+                <CardContent sx={{ position: "relative", height: "100%" }}>
+                  <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 1 }}>
+                    Operating Systems Distribution
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                    Live break-down across total inventory footprint nodes.
+                  </Typography>
+
+                  {statsLoading && (
+                    <Box sx={{ width: "100%", mt: 6 }}>
+                      <LinearProgress />
+                    </Box>
+                  )}
+
+                  {statsError && !statsLoading && (
+                    <Typography color="error" align="center" sx={{ mt: 6 }}>
+                      {statsError}
+                    </Typography>
+                  )}
+
+                  {!statsLoading && !statsError && osStats.length === 0 && (
+                    <Typography color="text.secondary" align="center" sx={{ mt: 6 }}>
+                      No OS data metrics available.
+                    </Typography>
+                  )}
+
+                  {!statsLoading && !statsError && osStats.length > 0 && (
+                    <Box sx={{ width: "100%", height: 280, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      <PieChart
+                        series={[
+                          {
+                            data: osStats,
+                            innerRadius: 40,
+                            outerRadius: 100,
+                            paddingAngle: 2,
+                            cornerRadius: 4,
+                            highlightScope: { faded: 'blurred', highlighted: 'onSeries' },
+                            faded: { additionalRadius: -10, color: 'gray' },
+                          },
+                        ]}
+                        height={260}
+                        slotProps={{
+                          legend: {
+                            direction: 'column',
+                            position: { vertical: 'middle', horizontal: 'right' },
+                            labelStyle: { fontSize: 12 },
+                            itemMarkWidth: 10,
+                            itemMarkHeight: 10,
+                            markGap: 6,
+                            itemGap: 8,
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
+        )}
         
         {/* VIEW 1: ASSETS */}
         {currentView === "assets" && (
@@ -633,7 +709,6 @@ export default function App({ mode, onToggleColorMode }) {
                 onSortModelChange={setSoftwareSortModel}
                 pageSizeOptions={[25, 50, 100]}
                 disableRowSelectionOnClick
-                /* Combined Click Action targets 'asset' column cell value mapped key structures directly */
                 onRowClick={(params) => setSelectedAssetId(params.row.asset)}
                 sx={{
                   bgcolor: "background.paper",
