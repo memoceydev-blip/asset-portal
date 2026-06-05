@@ -379,4 +379,167 @@ export default function App({ mode, onToggleColorMode }) {
       }
     };
 
-    loadSoft
+    loadSoftwares();
+  }, [softwarePaginationModel, softwareSortModel, debouncedSoftwareSearch, currentView]);
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
+      {/* Top App Bar */}
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Toolbar sx={{ gap: 2 }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="open navigation menu"
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+            {currentView === "assets" ? "Asset Master" : "Softwares Inventory"}
+          </Typography>
+
+          <Typography variant="body2" color="text.secondary">
+            {mode === "dark" ? "Dark mode" : "Light mode"}
+          </Typography>
+          <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
+              {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+            </IconButton>
+          </Tooltip>
+        </Toolbar>
+      </AppBar>
+
+      {/* Navigation Menu Modal Panel */}
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 250 }} role="presentation" onClick={() => setDrawerOpen(false)}>
+          <Typography variant="h6" sx={{ p: 2, fontWeight: 600 }}>
+            Navigation
+          </Typography>
+          <Divider />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton 
+                selected={currentView === "assets"} 
+                onClick={() => setCurrentView("assets")}
+              >
+                <ListItemIcon>
+                  <ComputerIcon />
+                </ListItemIcon>
+                <ListItemText primary="Assets" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton 
+                selected={currentView === "softwares"} 
+                onClick={() => setCurrentView("softwares")}
+              >
+                <ListItemIcon>
+                  <SettingsApplicationsIcon />
+                </ListItemIcon>
+                <ListItemText primary="Softwares" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </Box>
+      </Drawer>
+
+      {/* Primary Dashboard Panel Content Layout */}
+      <Container maxWidth={false} sx={{ py: 3 }}>
+        
+        {/* VIEW 1: ASSETS */}
+        {currentView === "assets" && (
+          <>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+              <TextField
+                fullWidth
+                label="Search Assets"
+                value={assetSearch}
+                onChange={(e) => {
+                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                  setAssetSearch(e.target.value);
+                }}
+              />
+            </Paper>
+
+            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+              <DataGrid
+                rows={assetRows}
+                columns={assetColumns}
+                loading={assetLoading}
+                rowCount={assetRowCount}
+                pagination
+                paginationMode="server"
+                sortingMode="server"
+                paginationModel={assetPaginationModel}
+                onPaginationModelChange={setAssetPaginationModel}
+                sortModel={assetSortModel}
+                onSortModelChange={setAssetSortModel}
+                pageSizeOptions={[25, 50, 100]}
+                disableRowSelectionOnClick
+                onRowClick={(params) => setSelectedAssetId(params.row.id)}
+                sx={{
+                  bgcolor: "background.paper",
+                  cursor: "pointer",
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                }}
+              />
+            </Paper>
+          </>
+        )}
+
+        {/* VIEW 2: SOFTWARES */}
+        {currentView === "softwares" && (
+          <>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+              <TextField
+                fullWidth
+                label="Search Softwares"
+                value={softwareSearch}
+                onChange={(e) => {
+                  setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                  setSoftwareSearch(e.target.value);
+                }}
+              />
+            </Paper>
+
+            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+              <DataGrid
+                rows={softwareRows}
+                columns={softwareColumns}
+                loading={softwareLoading}
+                rowCount={softwareRowCount}
+                pagination
+                paginationMode="server"
+                sortingMode="server"
+                paginationModel={softwarePaginationModel}
+                onPaginationModelChange={setSoftwarePaginationModel}
+                sortModel={softwareSortModel}
+                onSortModelChange={setSoftwareSortModel}
+                pageSizeOptions={[25, 50, 100]}
+                disableRowSelectionOnClick
+                sx={{
+                  bgcolor: "background.paper",
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                }}
+              />
+            </Paper>
+          </>
+        )}
+      </Container>
+
+      {/* Global Details Profile Modal Inspector */}
+      <AssetDetailsModal
+        assetId={selectedAssetId}
+        open={Boolean(selectedAssetId)}
+        onClose={() => setSelectedAssetId(null)}
+      />
+    </Box>
+  );
+}
+
+App.propTypes = {
+  mode: PropTypes.oneOf(["light", "dark"]).isRequired,
+  onToggleColorMode: PropTypes.func.isRequired,
+};
