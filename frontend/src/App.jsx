@@ -30,7 +30,7 @@ import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import { DataGrid } from "@mui/x-data-grid";
-import axios from "axios"; // Added explicit check for axios cancellation helpers
+import axios from "axios";
 import { api } from "./api";
 
 // ==========================================
@@ -69,7 +69,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
       return;
     }
 
-    // Abort controller ensures modal fetches don't overlap if user switches rows quickly
     const controller = new AbortController();
 
     const loadDetails = async () => {
@@ -86,7 +85,9 @@ function AssetDetailsModal({ assetId, open, onClose }) {
         console.error("Error fetching asset details profile:", err);
         setError("Failed to load asset details. Please try again.");
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
@@ -271,15 +272,26 @@ export default function App({ mode, onToggleColorMode }) {
   const [assetRows, setAssetRows] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetRowCount, setAssetRowCount] = useState(0);
-  const [assetSearch, setAssetSearch] = useState("");
-  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
   const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
 
+  // Dedicated column searches for Assets
+  const [assetSearchName, setAssetSearchName] = useState("");
+  const [assetSearchOS, setAssetSearchOS] = useState("");
+  const [assetSearchOwner, setAssetSearchOwner] = useState("");
+
+  const [debouncedAssetFilters, setDebouncedAssetFilters] = useState({ name: "", os: "", owner: "" });
+
   useEffect(() => {
-    const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
+    const delayHandler = setTimeout(() => {
+      setDebouncedAssetFilters({
+        name: assetSearchName,
+        os: assetSearchOS,
+        owner: assetSearchOwner,
+      });
+    }, 400);
     return () => clearTimeout(delayHandler);
-  }, [assetSearch]);
+  }, [assetSearchName, assetSearchOS, assetSearchOwner]);
 
   const assetColumns = useMemo(
     () => [
@@ -300,7 +312,6 @@ export default function App({ mode, onToggleColorMode }) {
   useEffect(() => {
     if (currentView !== "assets") return;
 
-    // Build abort token instance to prevent query race-overwriting condition blocks
     const controller = new AbortController();
 
     const loadAssets = async () => {
@@ -316,7 +327,10 @@ export default function App({ mode, onToggleColorMode }) {
             page_size: assetPaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: debouncedAssetSearch || undefined,
+            // Individual query filters sent natively to backend schema structures
+            name: debouncedAssetFilters.name || undefined,
+            os: debouncedAssetFilters.os || undefined,
+            owner: debouncedAssetFilters.owner || undefined,
           },
         });
 
@@ -326,7 +340,6 @@ export default function App({ mode, onToggleColorMode }) {
         if (axios.isCancel(error) || error.name === "CanceledError") return;
         console.error("Error loading master assets list:", error);
       } finally {
-        // Safe check to avoid flickering states on cancelled request blocks
         if (!controller.signal.aborted) {
           setAssetLoading(false);
         }
@@ -335,7 +348,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadAssets();
     return () => controller.abort();
-  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
+  }, [assetPaginationModel, assetSortModel, debouncedAssetFilters, currentView]);
 
   // ------------------------------------------
   // SOFTWARES VIEW STATE & EFFECTS
@@ -343,24 +356,36 @@ export default function App({ mode, onToggleColorMode }) {
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
   const [softwareRowCount, setSoftwareRowCount] = useState(0);
-  const [softwareSearch, setSoftwareSearch] = useState("");
-  const [debouncedSoftwareSearch, setDebouncedSoftwareSearch] = useState("");
   const [softwarePaginationModel, setSoftwarePaginationModel] = useState({ page: 0, pageSize: 50 });
   const [softwareSortModel, setSoftwareSortModel] = useState([{ field: "name", sort: "asc" }]);
 
-  useEffect(() => {
-    const delayHandler = setTimeout(() => setDebouncedSoftwareSearch(softwareSearch), 400);
-    return () => clearTimeout(delayHandler);
-  }, [softwareSearch]);
+  // Dedicated column searches for Software
+  const [swSearchName, setSwSearchName] = useState("");
+  const [swSearchVersion, setSwSearchVersion] = useState("");
+  const [swSearchOS, setSwSearchOS] = useState("");
+  const [swSearchOwner, setSwSearchOwner] = useState("");
 
-  // Added requested human-friendly "Owner" layout attribute field
+  const [debouncedSwFilters, setDebouncedSwFilters] = useState({ name: "", version: "", os: "", owner: "" });
+
+  useEffect(() => {
+    const delayHandler = setTimeout(() => {
+      setDebouncedSwFilters({
+        name: swSearchName,
+        version: swSearchVersion,
+        os: swSearchOS,
+        owner: swSearchOwner,
+      });
+    }, 400);
+    return () => clearTimeout(delayHandler);
+  }, [swSearchName, swSearchVersion, swSearchOS, swSearchOwner]);
+
   const softwareColumns = useMemo(
     () => [
       { field: "asset", headerName: "Asset", flex: 1 },
       { field: "name", headerName: "Name", flex: 1.5 },
       { field: "version", headerName: "Version", flex: 1 },
       { field: "os", headerName: "OS", flex: 1.2 },
-      { field: "owner", headerName: "Owner", flex: 1.1 }, 
+      { field: "owner", headerName: "Owner", flex: 1.1 },
     ],
     []
   );
@@ -368,7 +393,6 @@ export default function App({ mode, onToggleColorMode }) {
   useEffect(() => {
     if (currentView !== "softwares") return;
 
-    // Cancel old data grid requests immediately when user modifications hit hook arrays
     const controller = new AbortController();
 
     const loadSoftwares = async () => {
@@ -384,7 +408,11 @@ export default function App({ mode, onToggleColorMode }) {
             page_size: softwarePaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: debouncedSoftwareSearch || undefined,
+            // Column discrete keys mapped explicitly
+            name: debouncedSwFilters.name || undefined,
+            version: debouncedSwFilters.version || undefined,
+            os: debouncedSwFilters.os || undefined,
+            owner: debouncedSwFilters.owner || undefined,
           },
         });
 
@@ -402,7 +430,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadSoftwares();
     return () => controller.abort();
-  }, [softwarePaginationModel, softwareSortModel, debouncedSoftwareSearch, currentView]);
+  }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView]);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
@@ -467,22 +495,46 @@ export default function App({ mode, onToggleColorMode }) {
         </Box>
       </Drawer>
 
-      {/* Main Panel Content Workspace container */}
+      {/* Main Container Content */}
       <Container maxWidth={false} sx={{ py: 3 }}>
         
         {/* VIEW 1: ASSETS */}
         {currentView === "assets" && (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-              <TextField
-                fullWidth
-                label="Search Assets"
-                value={assetSearch}
-                onChange={(e) => {
-                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                  setAssetSearch(e.target.value);
-                }}
-              />
+            {/* Column-Specific Inputs Row for Assets (Name, OS, Owner) */}
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  size="small"
+                  label="Search Name"
+                  value={assetSearchName}
+                  onChange={(e) => {
+                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setAssetSearchName(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Search OS"
+                  value={assetSearchOS}
+                  onChange={(e) => {
+                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setAssetSearchOS(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Search Owner"
+                  value={assetSearchOwner}
+                  onChange={(e) => {
+                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setAssetSearchOwner(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
             </Paper>
 
             <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
@@ -514,16 +566,50 @@ export default function App({ mode, onToggleColorMode }) {
         {/* VIEW 2: SOFTWARES */}
         {currentView === "softwares" && (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-              <TextField
-                fullWidth
-                label="Search Softwares"
-                value={softwareSearch}
-                onChange={(e) => {
-                  setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                  setSoftwareSearch(e.target.value);
-                }}
-              />
+            {/* Column-Specific Inputs Row for Softwares (Name, Version, OS, Owner) */}
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                <TextField
+                  size="small"
+                  label="Search Name"
+                  value={swSearchName}
+                  onChange={(e) => {
+                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setSwSearchName(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Search Version"
+                  value={swSearchVersion}
+                  onChange={(e) => {
+                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setSwSearchVersion(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Search OS"
+                  value={swSearchOS}
+                  onChange={(e) => {
+                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setSwSearchOS(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  size="small"
+                  label="Search Owner"
+                  value={swSearchOwner}
+                  onChange={(e) => {
+                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                    setSwSearchOwner(e.target.value);
+                  }}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
             </Paper>
 
             <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
