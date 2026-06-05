@@ -122,7 +122,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
           Asset Details {assetId ? `#${assetId}` : ""}
         </Typography>
 
-        {/* New inline contextual meta details row placed strictly to the right side */}
         {!loading && details && (
           <Stack 
             direction="row" 
@@ -634,8 +633,11 @@ export default function App({ mode, onToggleColorMode }) {
                 onSortModelChange={setSoftwareSortModel}
                 pageSizeOptions={[25, 50, 100]}
                 disableRowSelectionOnClick
+                /* Combined Click Action targets 'asset' column cell value mapped key structures directly */
+                onRowClick={(params) => setSelectedAssetId(params.row.asset)}
                 sx={{
                   bgcolor: "background.paper",
+                  cursor: "pointer",
                   '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
                 }}
               />
