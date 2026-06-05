@@ -13,7 +13,9 @@ import {
   IconButton,
   LinearProgress,
   List,
+  ListItem,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
   Paper,
   Stack,
@@ -22,14 +24,17 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import ComputerIcon from "@mui/icons-material/Computer";
+import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
-import MenuIcon from "@mui/icons-material/Menu";
 import { DataGrid } from "@mui/x-data-grid";
 import { api } from "./api";
 
-const DRAWER_WIDTH = 240;
-
+// ==========================================
+// COMPONENT: Detail Row (Helper)
+// ==========================================
 function DetailRow({ label, value }) {
   return (
     <Box sx={{ py: 1 }}>
@@ -46,10 +51,13 @@ DetailRow.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
 };
 
+// ==========================================
+// COMPONENT: Asset Details Modal
+// ==========================================
 function AssetDetailsModal({ assetId, open, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null); // Track network errors
+  const [error, setError] = useState(null);
   const [softwareFilter, setSoftwareFilter] = useState("");
 
   useEffect(() => {
@@ -96,7 +104,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
       <DialogContent dividers>
         {loading && <LinearProgress sx={{ mb: 2 }} />}
 
-        {/* Display clear error messaging if API fails */}
         {error && (
           <Typography color="error" align="center" sx={{ py: 3 }}>
             {error}
@@ -237,320 +244,300 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 }
 
 AssetDetailsModal.propTypes = {
-  assetRecord: PropTypes.shape({
-    id: PropTypes.number,
-    name: PropTypes.string,
-    tag: PropTypes.string,
-    owner: PropTypes.string,
-  }),
+  assetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
 };
 
-function AssetsPage({ onSelectAsset }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [rowCount, setRowCount] = useState(0);
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
-  const [sortModel, setSortModel] = useState([{ field: "id", sort: "asc" }]);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+// ==========================================
+// COMPONENT: Main App Layout & View Router
+// ==========================================
+export default function App({ mode, onToggleColorMode }) {
+  // Navigation State
+  const [currentView, setCurrentView] = useState("assets"); // "assets" or "softwares"
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Debounce logic for server-side search input
+  // Shared Modals State
+  const [selectedAssetId, setSelectedAssetId] = useState(null);
+
+  // ------------------------------------------
+  // ASSETS VIEW STATE & EFFECTS
+  // ------------------------------------------
+  const [assetRows, setAssetRows] = useState([]);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [assetRowCount, setAssetRowCount] = useState(0);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
+  const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
+  const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
+
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [search]);
+    const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
+    return () => clearTimeout(delayHandler);
+  }, [assetSearch]);
 
-  const columns = useMemo(
+  const assetColumns = useMemo(
     () => [
       { field: "id", headerName: "ID", flex: 0.6 },
       { field: "name", headerName: "Name", flex: 1.2 },
       { field: "tag", headerName: "Tag", flex: 1 },
       { field: "type", headerName: "Type", flex: 1 },
-      { field: "owner", headerName: "Owner", flex: 1.2 },
-      { field: "location", headerName: "Location", flex: 1.2 },
+      { field: "owner", headerName: "Owner", flex: 1.1 },
+      { field: "location", headerName: "Location", flex: 1.1 },
       { field: "os", headerName: "OS", flex: 1.1 },
       { field: "status", headerName: "Status", flex: 0.9 },
       { field: "ips", headerName: "IPs", flex: 1.3 },
-      { field: "alias", headerName: "Alias", flex: 1.1 },
+      { field: "alias", headerName: "Alias", flex: 1.2 },
     ],
     []
   );
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    if (currentView !== "assets") return;
+
+    const loadAssets = async () => {
+      setAssetLoading(true);
       try {
-        const sortBy = sortModel[0]?.field || "id";
-        const sortDir = sortModel[0]?.sort || "asc";
+        const sortBy = assetSortModel[0]?.field || "id";
+        const sortDir = assetSortModel[0]?.sort || "asc";
 
         const response = await api.get("/api/v1/assets", {
           params: {
-            page: paginationModel.page + 1,
-            page_size: paginationModel.pageSize,
+            page: assetPaginationModel.page + 1,
+            page_size: assetPaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: debouncedSearch || undefined,
+            search: debouncedAssetSearch || undefined,
           },
         });
 
-        setRows(response.data.items || []);
-        setRowCount(response.data.total || 0);
+        setAssetRows(response.data?.items || []);
+        setAssetRowCount(response.data?.total || 0);
       } catch (error) {
-        console.error("Failed to load assets:", error);
+        console.error("Error loading master assets list:", error);
       } finally {
-        setLoading(false);
+        setAssetLoading(false);
       }
     };
 
-    load();
-  }, [paginationModel, sortModel, debouncedSearch]);
+    loadAssets();
+  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
 
-  return (
-    <>
-      <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-        <TextField
-          fullWidth
-          label="Search assets"
-          value={search}
-          onChange={(e) => {
-            setPaginationModel((prev) => ({ ...prev, page: 0 }));
-            setSearch(e.target.value);
-          }}
-        />
-      </Paper>
-
-      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          rowCount={rowCount}
-          pagination
-          paginationMode="server"
-          sortingMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
-          pageSizeOptions={[25, 50, 100]}
-          disableRowSelectionOnClick
-          onRowClick={(params) => setSelectedAssetId(params.row.id)}
-          sx={{
-            bgcolor: "background.paper",
-            cursor: "pointer",
-            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-          }}
-        />
-      </Paper>
-    </>
-  );
-}
-
-AssetsPage.propTypes = {
-  onSelectAsset: PropTypes.func.isRequired,
-};
-
-function SoftwaresPage({ onSelectAsset }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // ------------------------------------------
+  // SOFTWARES VIEW STATE & EFFECTS
+  // ------------------------------------------
+  const [softwareRows, setSoftwareRows] = useState([]);
+  const [softwareLoading, setSoftwareLoading] = useState(false);
+  const [softwareRowCount, setSoftwareRowCount] = useState(0);
+  const [softwareSearch, setSoftwareSearch] = useState("");
+  const [debouncedSoftwareSearch, setDebouncedSoftwareSearch] = useState("");
+  const [softwarePaginationModel, setSoftwarePaginationModel] = useState({ page: 0, pageSize: 50 });
+  const [softwareSortModel, setSoftwareSortModel] = useState([{ field: "name", sort: "asc" }]);
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 400);
-    return () => clearTimeout(handler);
-  }, [search]);
+    const delayHandler = setTimeout(() => setDebouncedSoftwareSearch(softwareSearch), 400);
+    return () => clearTimeout(delayHandler);
+  }, [softwareSearch]);
 
-  const columns = useMemo(
+  const softwareColumns = useMemo(
     () => [
-      { field: "asset_id", headerName: "Asset ID", flex: 0.7 },
-      { field: "sw_name", headerName: "Software", flex: 1.4 },
-      { field: "sw_version", headerName: "Version", flex: 1.1 },
-      { field: "os_name", headerName: "OS Name", flex: 1.2 },
+      { field: "asset", headerName: "Asset", flex: 1 },
+      { field: "name", headerName: "Name", flex: 1.5 },
+      { field: "version", headerName: "Version", flex: 1 },
+      { field: "os", headerName: "OS", flex: 1.2 },
     ],
     []
   );
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
+    if (currentView !== "softwares") return;
+
+    const loadSoftwares = async () => {
+      setSoftwareLoading(true);
       try {
-        const response = await api.get("/api/v1/software", {
-          params: { search: debouncedSearch || undefined },
+        const sortBy = softwareSortModel[0]?.field || "name";
+        const sortDir = softwareSortModel[0]?.sort || "asc";
+
+        const response = await api.get("/api/v1/softwares", {
+          params: {
+            page: softwarePaginationModel.page + 1,
+            page_size: softwarePaginationModel.pageSize,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            search: debouncedSoftwareSearch || undefined,
+          },
         });
 
-        const items = response.data.items || response.data || [];
-        setRows(
-          items.map((item, index) => ({
-            id: `${item.asset_id}-${item.sw_name || index}`,
-            ...item,
-          }))
-        );
+        // Mapping software items to have a safe ID required by DataGrid layout patterns
+        const itemsWithIds = (response.data?.items || []).map((item, index) => ({
+          id: item.id || `sw-${index}-${item.name}`,
+          ...item,
+        }));
+
+        setSoftwareRows(itemsWithIds);
+        setSoftwareRowCount(response.data?.total || 0);
       } catch (error) {
-        console.error("Failed to load software packages:", error);
+        console.error("Error loading master software profiles:", error);
       } finally {
-        setLoading(false);
+        setSoftwareLoading(false);
       }
     };
 
-    load();
-  }, [debouncedSearch]);
-
-  const handleRowClick = async (params) => {
-    try {
-      const response = await api.get(`/api/v1/assets/${params.row.asset_id}/summary`);
-      // Explicitly normalize payload structure ensuring an active 'id' key exists for the modal's effect hooks
-      const assetData = {
-        id: params.row.asset_id,
-        ...response.data
-      };
-      onSelectAsset(assetData);
-    } catch (error) {
-      console.error("Failed to fetch asset summary details:", error);
-    }
-  };
+    loadSoftwares();
+  }, [softwarePaginationModel, softwareSortModel, debouncedSoftwareSearch, currentView]);
 
   return (
-    <>
-      <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-        <TextField
-          fullWidth
-          label="Search softwares"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </Paper>
+    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
+      {/* Top App Bar */}
+      <AppBar position="sticky" color="default" elevation={1}>
+        <Toolbar sx={{ gap: 2 }}>
+          <IconButton
+            color="inherit"
+            edge="start"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="open navigation menu"
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
+            {currentView === "assets" ? "Asset Master" : "Softwares Inventory"}
+          </Typography>
 
-      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          disableRowSelectionOnClick
-          onRowClick={handleRowClick}
-          sx={{
-            bgcolor: "background.paper",
-            cursor: "pointer",
-            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-          }}
-        />
-      </Paper>
-    </>
-  );
-}
-
-SoftwaresPage.propTypes = {
-  onSelectAsset: PropTypes.func.isRequired,
-};
-
-export default function App({ mode, onToggleColorMode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState("assets");
-  const [selectedAsset, setSelectedAsset] = useState(null);
-
-  const handleNavigate = (page) => {
-    setCurrentPage(page);
-    setMobileOpen(false);
-  };
-
-  const navigation = (
-    <Box sx={{ width: DRAWER_WIDTH }} role="presentation">
-      <Toolbar>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Navigation
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        <ListItemButton selected={currentPage === "assets"} onClick={() => handleNavigate("assets")}>
-          <ListItemText primary="Assets" />
-        </ListItemButton>
-        <ListItemButton selected={currentPage === "softwares"} onClick={() => handleNavigate("softwares")}>
-          <ListItemText primary="Softwares" />
-        </ListItemButton>
-      </List>
-    </Box>
-  );
-
-  return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary", display: "flex" }}>
-      <Drawer
-        variant="temporary"
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        ModalProps={{ keepMounted: true }}
-        sx={{
-          display: { xs: "block", md: "none" },
-          '& .MuiDrawer-paper': { boxSizing: "border-box", width: DRAWER_WIDTH },
-        }}
-      >
-        {navigation}
-      </Drawer>
-
-      <Drawer
-        variant="permanent"
-        sx={{
-          display: { xs: "none", md: "block" },
-          '& .MuiDrawer-paper': {
-            boxSizing: "border-box",
-            width: DRAWER_WIDTH,
-          },
-        }}
-        open
-      >
-        {navigation}
-      </Drawer>
-
-      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <AppBar
-          position="sticky"
-          color="default"
-          elevation={1}
-          sx={{ width: "100%" }}
-        >
-          <Toolbar sx={{ gap: 2 }}>
-            <IconButton
-              color="inherit"
-              edge="start"
-              onClick={() => setMobileOpen(true)}
-              sx={{ display: { md: "none" } }}
-              aria-label="open navigation"
-            >
-              <MenuIcon />
+          <Typography variant="body2" color="text.secondary">
+            {mode === "dark" ? "Dark mode" : "Light mode"}
+          </Typography>
+          <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+            <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
+              {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
-              {currentPage === "assets" ? "Assets" : "Softwares"}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {mode === "dark" ? "Dark mode" : "Light mode"}
-            </Typography>
-            <Tooltip title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
-              <IconButton color="inherit" onClick={onToggleColorMode} aria-label="toggle color mode">
-                {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-              </IconButton>
-            </Tooltip>
-          </Toolbar>
-        </AppBar>
+          </Tooltip>
+        </Toolbar>
+      </AppBar>
 
-        <Container maxWidth={false} sx={{ py: 3, flexGrow: 1 }}>
-          {currentPage === "assets" ? (
-            <AssetsPage onSelectAsset={setSelectedAsset} />
-          ) : (
-            <SoftwaresPage onSelectAsset={setSelectedAsset} />
-          )}
-        </Container>
-      </Box>
+      {/* Navigation Modal / Drawer Component (Top-Left Stack) */}
+      <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+        <Box sx={{ width: 250 }} role="presentation" onClick={() => setDrawerOpen(false)}>
+          <Typography variant="h6" sx={{ p: 2, fontWeight: 600 }}>
+            Navigation
+          </Typography>
+          <Divider />
+          <List>
+            <ListItem disablePadding>
+              <ListItemButton 
+                selected={currentView === "assets"} 
+                onClick={() => setCurrentView("assets")}
+              >
+                <ListItemIcon>
+                  <ComputerIcon />
+                </ListItemIcon>
+                <ListItemText primary="Assets" />
+              </ListItemButton>
+            </ListItem>
+            <ListItem disablePadding>
+              <ListItemButton 
+                selected={currentView === "softwares"} 
+                onClick={() => setCurrentView("softwares")}
+              >
+                <ListItemIcon>
+                  <SettingsApplicationsIcon />
+                </ListItemIcon>
+                <ListItemText primary="Softwares" />
+              </ListItemButton>
+            </ListItem>
+          </List>
+        </Box>
+      </Drawer>
 
+      {/* Primary Dashboard Content Panel Container */}
+      <Container maxWidth={false} sx={{ py: 3 }}>
+        
+        {/* VIEW 1: ASSETS */}
+        {currentView === "assets" && (
+          <>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+              <TextField
+                fullWidth
+                label="Search Assets"
+                value={assetSearch}
+                onChange={(e) => {
+                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                  setAssetSearch(e.target.value);
+                }}
+              />
+            </Paper>
+
+            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+              <DataGrid
+                rows={assetRows}
+                columns={assetColumns}
+                loading={assetLoading}
+                rowCount={assetRowCount}
+                pagination
+                paginationMode="server"
+                sortingMode="server"
+                paginationModel={assetPaginationModel}
+                onPaginationModelChange={setAssetPaginationModel}
+                sortModel={assetSortModel}
+                onSortModelChange={setAssetSortModel}
+                pageSizeOptions={[25, 50, 100]}
+                disableRowSelectionOnClick
+                onRowClick={(params) => setSelectedAssetId(params.row.id)}
+                sx={{
+                  bgcolor: "background.paper",
+                  cursor: "pointer",
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                }}
+              />
+            </Paper>
+          </>
+        )}
+
+        {/* VIEW 2: SOFTWARES */}
+        {currentView === "softwares" && (
+          <>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+              <TextField
+                fullWidth
+                label="Search Softwares"
+                value={softwareSearch}
+                onChange={(e) => {
+                  setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                  setSoftwareSearch(e.target.value);
+                }}
+              />
+            </Paper>
+
+            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+              <DataGrid
+                rows={softwareRows}
+                columns={softwareColumns}
+                loading={softwareLoading}
+                rowCount={softwareRowCount}
+                pagination
+                paginationMode="server"
+                sortingMode="server"
+                paginationModel={softwarePaginationModel}
+                onPaginationModelChange={setSoftwarePaginationModel}
+                sortModel={softwareSortModel}
+                onSortModelChange={setSoftwareSortModel}
+                pageSizeOptions={[25, 50, 100]}
+                disableRowSelectionOnClick
+                sx={{
+                  bgcolor: "background.paper",
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                }}
+              />
+            </Paper>
+          </>
+        )}
+      </Container>
+
+      {/* Asset Global Profile View Inspector Overlay */}
       <AssetDetailsModal
-        assetRecord={selectedAsset}
-        open={Boolean(selectedAsset)}
-        onClose={() => setSelectedAsset(null)}
+        assetId={selectedAssetId}
+        open={Boolean(selectedAssetId)}
+        onClose={() => setSelectedAssetId(null)}
       />
     </Box>
   );
