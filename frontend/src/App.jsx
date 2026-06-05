@@ -22,6 +22,12 @@ import {
   ListItemText,
   Paper,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Toolbar,
   Tooltip,
@@ -286,7 +292,6 @@ AssetDetailsModal.propTypes = {
 // COMPONENT: Main App Layout & View Router
 // ==========================================
 export default function App({ mode, onToggleColorMode }) {
-  // Default to the new summary panel view
   const [currentView, setCurrentView] = useState("summary");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
@@ -294,7 +299,8 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   // SUMMARY / STATS STATE & EFFECTS
   // ------------------------------------------
-  const [osStats, setOsStats] = useState([]);
+  const [osRawItems, setOsRawItems] = useState([]); // Keeps original { name, count } for human table
+  const [osChartData, setOsChartData] = useState([]); // Maps structural items format to MUI chart format
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(null);
 
@@ -306,20 +312,20 @@ export default function App({ mode, onToggleColorMode }) {
       setStatsLoading(true);
       setStatsError(null);
       try {
-        const response = await api.get("/api/v1/stats/os", {
-          signal: controller.signal,
-        });
-        // Transform incoming items structure (name, count) to MUI Chart syntax schema structure (id, value, label)
+        const response = await api.get("/api/v1/stats/os");
         const items = response.data?.items || [];
-        const formattedData = items.map((item, index) => ({
+        
+        setOsRawItems(items);
+        
+        const formattedChartData = items.map((item, index) => ({
           id: index,
           value: item.count,
           label: item.name || "Unknown OS",
         }));
-        setOsStats(formattedData);
+        setOsChartData(formattedChartData);
       } catch (error) {
         if (axios.isCancel(error) || error.name === "CanceledError") return;
-        console.error("Error loading OS distribution statistics metrics:", error);
+        console.error("Error loading OS distribution statistics:", error);
         setStatsError("Failed to load metrics summaries.");
       } finally {
         if (!controller.signal.aborted) {
@@ -515,7 +521,7 @@ export default function App({ mode, onToggleColorMode }) {
           <Divider />
           <List>
             <ListItem disablePadding>
-              <ListItemButton selected={currentView === "summary"} onClick={() => setCurrentView("summarypanel" && "summary")}>
+              <ListItemButton selected={currentView === "summary"} onClick={() => setCurrentView("summary")}>
                 <ListItemIcon><DashboardIcon /></ListItemIcon>
                 <ListItemText primary="Summary" />
               </ListItemButton>
@@ -539,65 +545,88 @@ export default function App({ mode, onToggleColorMode }) {
       {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
         
-        {/* VIEW 0: DASHBOARD SUMMARY PANEL */}
+        {/* VIEW 0: DASHBOARD SUMMARY PANEL WITH GRAPH AND HUMAN DATA TABLE */}
         {currentView === "summary" && (
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6} lg={5}>
-              <Card sx={{ bgcolor: "background.paper", minHeight: 400 }}>
-                <CardContent sx={{ position: "relative", height: "100%" }}>
+            <Grid item xs={12} lg={10}>
+              <Card sx={{ bgcolor: "background.paper", p: 1 }}>
+                <CardContent>
                   <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 1 }}>
                     Operating Systems Distribution
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Live break-down across total inventory footprint nodes.
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                    Live telemetry representation breakdown mapping infrastructure platform ratios.
                   </Typography>
 
                   {statsLoading && (
-                    <Box sx={{ width: "100%", mt: 6 }}>
+                    <Box sx={{ width: "100%", py: 6 }}>
                       <LinearProgress />
                     </Box>
                   )}
 
                   {statsError && !statsLoading && (
-                    <Typography color="error" align="center" sx={{ mt: 6 }}>
+                    <Typography color="error" align="center" sx={{ py: 4 }}>
                       {statsError}
                     </Typography>
                   )}
 
-                  {!statsLoading && !statsError && osStats.length === 0 && (
-                    <Typography color="text.secondary" align="center" sx={{ mt: 6 }}>
-                      No OS data metrics available.
+                  {!statsLoading && !statsError && osChartData.length === 0 && (
+                    <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+                      No operating system metrics available.
                     </Typography>
                   )}
 
-                  {!statsLoading && !statsError && osStats.length > 0 && (
-                    <Box sx={{ width: "100%", height: 280, display: "flex", justifyContent: "center", alignItems: "center" }}>
-                      <PieChart
-                        series={[
-                          {
-                            data: osStats,
-                            innerRadius: 40,
-                            outerRadius: 100,
-                            paddingAngle: 2,
-                            cornerRadius: 4,
-                            highlightScope: { faded: 'blurred', highlighted: 'onSeries' },
-                            faded: { additionalRadius: -10, color: 'gray' },
-                          },
-                        ]}
-                        height={260}
-                        slotProps={{
-                          legend: {
-                            direction: 'column',
-                            position: { vertical: 'middle', horizontal: 'right' },
-                            labelStyle: { fontSize: 12 },
-                            itemMarkWidth: 10,
-                            itemMarkHeight: 10,
-                            markGap: 6,
-                            itemGap: 8,
-                          }
-                        }}
-                      />
-                    </Box>
+                  {!statsLoading && !statsError && osChartData.length > 0 && (
+                    <Grid container spacing={4} alignItems="center">
+                      {/* Left Side: Pie Chart with hidden legend */}
+                      <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
+                        <Box sx={{ width: "100%", maxWidth: 300, height: 260 }}>
+                          <PieChart
+                            series={[
+                              {
+                                data: osChartData,
+                                innerRadius: 50,
+                                outerRadius: 100,
+                                paddingAngle: 3,
+                                cornerRadius: 5,
+                                highlightScope: { faded: 'blurred', highlighted: 'onSeries' },
+                              },
+                            ]}
+                            height={250}
+                            // Legend hidden here to maximize chart layout space
+                            slotProps={{
+                              legend: { hidden: true }
+                            }}
+                          />
+                        </Box>
+                      </Grid>
+
+                      {/* Right Side: Clean human eye semantic table representation */}
+                      <Grid item xs={12} md={7}>
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
+                          <Table stickyHeader size="small" aria-label="Operating Systems inventory counts">
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Operating System</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 120 }}>Count</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {osRawItems.map((row, index) => (
+                                <TableRow key={`${row.name || "os"}-${index}`} hover>
+                                  <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                                    {row.name || "Unknown Operating System"}
+                                  </TableCell>
+                                  <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.95rem" }}>
+                                    {row.count.toLocaleString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Grid>
+                    </Grid>
                   )}
                 </CardContent>
               </Card>
