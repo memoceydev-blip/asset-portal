@@ -267,31 +267,20 @@ export default function App({ mode, onToggleColorMode }) {
   const [selectedAssetId, setSelectedAssetId] = useState(null);
 
   // ------------------------------------------
-  // ASSETS VIEW STATE & EFFECTS
+  // ASSETS VIEW STATE & EFFECTS (Restored to General Global Search)
   // ------------------------------------------
   const [assetRows, setAssetRows] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetRowCount, setAssetRowCount] = useState(0);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
   const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
 
-  // Dedicated column searches for Assets
-  const [assetSearchName, setAssetSearchName] = useState("");
-  const [assetSearchOS, setAssetSearchOS] = useState("");
-  const [assetSearchOwner, setAssetSearchOwner] = useState("");
-
-  const [debouncedAssetFilters, setDebouncedAssetFilters] = useState({ name: "", os: "", owner: "" });
-
   useEffect(() => {
-    const delayHandler = setTimeout(() => {
-      setDebouncedAssetFilters({
-        name: assetSearchName,
-        os: assetSearchOS,
-        owner: assetSearchOwner,
-      });
-    }, 400);
+    const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
     return () => clearTimeout(delayHandler);
-  }, [assetSearchName, assetSearchOS, assetSearchOwner]);
+  }, [assetSearch]);
 
   const assetColumns = useMemo(
     () => [
@@ -327,10 +316,7 @@ export default function App({ mode, onToggleColorMode }) {
             page_size: assetPaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            // Individual query filters sent natively to backend schema structures
-            name: debouncedAssetFilters.name || undefined,
-            os: debouncedAssetFilters.os || undefined,
-            owner: debouncedAssetFilters.owner || undefined,
+            search: debouncedAssetSearch || undefined, // Uses single general parameter
           },
         });
 
@@ -348,10 +334,10 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadAssets();
     return () => controller.abort();
-  }, [assetPaginationModel, assetSortModel, debouncedAssetFilters, currentView]);
+  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
 
   // ------------------------------------------
-  // SOFTWARES VIEW STATE & EFFECTS
+  // SOFTWARES VIEW STATE & EFFECTS (Maintains Split-Column Search Matrix)
   // ------------------------------------------
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
@@ -359,7 +345,6 @@ export default function App({ mode, onToggleColorMode }) {
   const [softwarePaginationModel, setSoftwarePaginationModel] = useState({ page: 0, pageSize: 50 });
   const [softwareSortModel, setSoftwareSortModel] = useState([{ field: "name", sort: "asc" }]);
 
-  // Dedicated column searches for Software
   const [swSearchName, setSwSearchName] = useState("");
   const [swSearchVersion, setSwSearchVersion] = useState("");
   const [swSearchOS, setSwSearchOS] = useState("");
@@ -408,7 +393,6 @@ export default function App({ mode, onToggleColorMode }) {
             page_size: softwarePaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            // Column discrete keys mapped explicitly
             name: debouncedSwFilters.name || undefined,
             version: debouncedSwFilters.version || undefined,
             os: debouncedSwFilters.os || undefined,
@@ -461,7 +445,7 @@ export default function App({ mode, onToggleColorMode }) {
         </Toolbar>
       </AppBar>
 
-      {/* Drawer Panel Menu */}
+      {/* Drawer Menu */}
       <Drawer anchor="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
         <Box sx={{ width: 250 }} role="presentation" onClick={() => setDrawerOpen(false)}>
           <Typography variant="h6" sx={{ p: 2, fontWeight: 600 }}>
@@ -495,46 +479,22 @@ export default function App({ mode, onToggleColorMode }) {
         </Box>
       </Drawer>
 
-      {/* Main Container Content */}
+      {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
         
-        {/* VIEW 1: ASSETS */}
+        {/* VIEW 1: ASSETS (Restored to 1 Global Search Box) */}
         {currentView === "assets" && (
           <>
-            {/* Column-Specific Inputs Row for Assets (Name, OS, Owner) */}
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-                <TextField
-                  size="small"
-                  label="Search Name"
-                  value={assetSearchName}
-                  onChange={(e) => {
-                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setAssetSearchName(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search OS"
-                  value={assetSearchOS}
-                  onChange={(e) => {
-                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setAssetSearchOS(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search Owner"
-                  value={assetSearchOwner}
-                  onChange={(e) => {
-                    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setAssetSearchOwner(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-              </Stack>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+              <TextField
+                fullWidth
+                label="Search Assets"
+                value={assetSearch}
+                onChange={(e) => {
+                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                  setAssetSearch(e.target.value);
+                }}
+              />
             </Paper>
 
             <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
@@ -563,10 +523,9 @@ export default function App({ mode, onToggleColorMode }) {
           </>
         )}
 
-        {/* VIEW 2: SOFTWARES */}
+        {/* VIEW 2: SOFTWARES (Has Individual Name, Version, OS, Owner Row Filters) */}
         {currentView === "softwares" && (
           <>
-            {/* Column-Specific Inputs Row for Softwares (Name, Version, OS, Owner) */}
             <Paper sx={{ p: 2, mb: 2 }}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                 <TextField
@@ -637,7 +596,7 @@ export default function App({ mode, onToggleColorMode }) {
         )}
       </Container>
 
-      {/* Shared Asset Details Modal */}
+      {/* Shared details modal overlay inspector panels */}
       <AssetDetailsModal
         assetId={selectedAssetId}
         open={Boolean(selectedAssetId)}
