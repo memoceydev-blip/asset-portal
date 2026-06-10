@@ -138,9 +138,9 @@ function AssetDetailsModal({ assetId, open, onClose }) {
             {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
             {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
             {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
-            {details?.extra_info?.ilo && (
+            {details?.ilo && (
               <Chip 
-                label={`iLO: ${details.extra_info.ilo}`} 
+                label={`iLO: ${details.ilo}`} 
                 size="small" 
                 color="info" 
                 variant="outlined" 
