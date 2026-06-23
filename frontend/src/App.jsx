@@ -39,10 +39,25 @@ import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
+import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import { DataGrid } from "@mui/x-data-grid";
 import { PieChart } from "@mui/x-charts/PieChart";
 import axios from "axios";
 import { api } from "./api";
+
+// ==========================================
+// HELPER: Power State Visual Configuration
+// ==========================================
+const getPowerStateConfig = (state) => {
+  const normalized = state?.toLowerCase() || "";
+  if (normalized.includes("on")) {
+    return { color: "success", label: "Powered On" };
+  }
+  if (normalized.includes("off")) {
+    return { color: "error", label: "Powered Off" };
+  }
+  return { color: "default", label: "Unknown" };
+};
 
 // ==========================================
 // COMPONENT: Detail Row (Helper)
@@ -118,33 +133,53 @@ function AssetDetailsModal({ assetId, open, onClose }) {
     });
   }, [details, softwareFilter]);
 
+  // Generate fancy styling properties for the power state subtitle badge
+  const powerConfig = useMemo(() => {
+    return getPowerStateConfig(details?.power_state);
+  }, [details?.power_state]);
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle 
         sx={{ 
           display: "flex", 
-          alignItems: "center", 
+          alignItems: "flex-start", 
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 2
         }}
       >
-        <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
-          Asset Details {assetId ? `#${assetId}` : ""}
-        </Typography>
+        {/* Left Side: Title and Subtitle Power State Section directly underneath */}
+        <Stack spacing={0.5}>
+          <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+            Asset Details {assetId ? `#${assetId}` : ""}
+          </Typography>
+          
+          {!loading && details && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
+              <PowerSettingsNewIcon 
+                color={powerConfig.color === "default" ? "disabled" : powerConfig.color} 
+                sx={{ fontSize: "1rem" }} 
+              />
+              <Typography 
+                variant="caption" 
+                color={powerConfig.color === "default" ? "text.secondary" : `${powerConfig.color}.main`}
+                sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}
+              >
+                {powerConfig.label}
+              </Typography>
+            </Box>
+          )}
+        </Stack>
 
+        {/* Right Side: Identity Bubble Rows */}
         {!loading && details && (
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ marginLeft: "auto" }}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
             {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
             {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
             {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
-            {details?.ilo && (
-              <Chip 
-                label={`iLO: ${details.ilo}`} 
-                size="small" 
-                color="info" 
-                variant="outlined" 
-              />
+            {details?.extra_info?.ilo && (
+              <Chip label={`iLO: ${details.extra_info.ilo}`} size="small" color="info" variant="outlined" />
             )}
           </Stack>
         )}
@@ -307,8 +342,8 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   // SUMMARY / STATS STATE & EFFECTS
   // ------------------------------------------
-  const [osRawItems, setOsRawItems] = useState([]); // Keeps original { name, count } for human table
-  const [osChartData, setOsChartData] = useState([]); // Maps structural items format to MUI chart format
+  const [osRawItems, setOsRawItems] = useState([]);
+  const [osChartData, setOsChartData] = useState([]);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(null);
 
@@ -362,6 +397,7 @@ export default function App({ mode, onToggleColorMode }) {
     return () => clearTimeout(delayHandler);
   }, [assetSearch]);
 
+  // Appending Power State right next to Status with an explicit inline layout dot renderer
   const assetColumns = useMemo(
     () => [
       { field: "id", headerName: "ID", flex: 0.6 },
@@ -372,6 +408,27 @@ export default function App({ mode, onToggleColorMode }) {
       { field: "location", headerName: "Location", flex: 1.1 },
       { field: "os", headerName: "OS", flex: 1.1 },
       { field: "status", headerName: "Status", flex: 0.9 },
+      { 
+        field: "power_state", 
+        headerName: "Power State", 
+        flex: 1.1,
+        renderCell: (params) => {
+          const cfg = getPowerStateConfig(params.value);
+          return (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
+              <Box 
+                sx={{ 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: "50%", 
+                  bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` 
+                }} 
+              />
+              <Typography variant="body2">{cfg.label}</Typography>
+            </Box>
+          );
+        }
+      },
       { field: "ips", headerName: "IPs", flex: 1.3 },
       { field: "alias", headerName: "Alias", flex: 1.2 },
     ],
@@ -553,7 +610,7 @@ export default function App({ mode, onToggleColorMode }) {
       {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
         
-        {/* VIEW 0: DASHBOARD SUMMARY PANEL WITH GRAPH AND HUMAN DATA TABLE */}
+        {/* VIEW 0: DASHBOARD SUMMARY PANEL */}
         {currentView === "summary" && (
           <Grid container spacing={3}>
             <Grid item xs={12} lg={10}>
@@ -586,7 +643,6 @@ export default function App({ mode, onToggleColorMode }) {
 
                   {!statsLoading && !statsError && osChartData.length > 0 && (
                     <Grid container spacing={4} alignItems="center">
-                      {/* Left Side: Pie Chart with hidden legend */}
                       <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
                         <Box sx={{ width: "100%", maxWidth: 300, height: 260 }}>
                           <PieChart
@@ -601,7 +657,6 @@ export default function App({ mode, onToggleColorMode }) {
                               },
                             ]}
                             height={250}
-                            // Legend hidden here to maximize chart layout space
                             slotProps={{
                               legend: { hidden: true }
                             }}
@@ -609,7 +664,6 @@ export default function App({ mode, onToggleColorMode }) {
                         </Box>
                       </Grid>
 
-                      {/* Right Side: Clean human eye semantic table representation */}
                       <Grid item xs={12} md={7}>
                         <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
                           <Table stickyHeader size="small" aria-label="Operating Systems inventory counts">
