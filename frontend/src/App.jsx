@@ -242,7 +242,7 @@ function AssetDetailsModal({ assetRecord, open, onClose }) {
                           {details.users_info.map((user, idx) => (
                             <TableRow key={idx}>
                               <TableCell style={{ fontWeight: 500 }}>{user.Username}</TableCell>
-                              <TableCell>{user["last login"] || "Never"}</TableCell>
+                              <TableCell style={{ fontWeight: 500 }}>{user.last_login || "Never" }</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
