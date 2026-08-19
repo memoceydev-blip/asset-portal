@@ -43,7 +43,7 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
-import FileDownloadIcon from "@mui/icons-material/FileDownload";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { DataGrid } from "@mui/x-data-grid";
 import { PieChart } from "@mui/x-charts/PieChart";
 import axios from "axios";
@@ -410,6 +410,28 @@ AssetDetailsModal.propTypes = {
   assetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
+};
+
+// Common Fancy Export Button Styling Configuration
+const exportButtonSx = {
+  borderRadius: 2,
+  px: 2.5,
+  py: 0.8,
+  fontWeight: 600,
+  letterSpacing: "0.2px",
+  textTransform: "none",
+  whiteSpace: "nowrap",
+  borderColor: "action.disabledBackground",
+  color: "text.primary",
+  bgcolor: "action.hover",
+  transition: "all 0.2s ease-in-out",
+  "&:hover": {
+    bgcolor: "primary.main",
+    color: "primary.contrastText",
+    borderColor: "primary.main",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    transform: "translateY(-1px)",
+  },
 };
 
 // ==========================================
@@ -852,7 +874,7 @@ export default function App({ mode, onToggleColorMode }) {
         
         {currentView === "assets" && (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 550, display: "flex", gap: 2, alignItems: "center" }}>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 580, display: "flex", gap: 2, alignItems: "center" }}>
               <TextField
                 fullWidth
                 size="small"
@@ -864,12 +886,11 @@ export default function App({ mode, onToggleColorMode }) {
                 }}
               />
               <Button
-                variant="contained"
-                color="success"
-                startIcon={<FileDownloadIcon />}
+                variant="outlined"
+                startIcon={<FileDownloadOutlinedIcon />}
                 onClick={handleExportAssetsExcel}
                 disabled={!assetRows || assetRows.length === 0}
-                sx={{ whiteSpace: "nowrap" }}
+                sx={exportButtonSx}
               >
                 Export Excel
               </Button>
@@ -947,12 +968,11 @@ export default function App({ mode, onToggleColorMode }) {
                   sx={{ flex: 1 }}
                 />
                 <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<FileDownloadIcon />}
+                  variant="outlined"
+                  startIcon={<FileDownloadOutlinedIcon />}
                   onClick={handleExportSoftwaresExcel}
                   disabled={!softwareRows || softwareRows.length === 0}
-                  sx={{ whiteSpace: "nowrap" }}
+                  sx={exportButtonSx}
                 >
                   Export Excel
                 </Button>
