@@ -174,13 +174,33 @@ function AssetDetailsModal({ assetId, open, onClose }) {
         </Stack>
 
         {!loading && details && (
-          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
-            {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
-            {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
-            {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
-            {details?.ilo && (
-              <Chip label={`iLO: ${details.ilo}`} size="small" color="info" variant="outlined" />
-            )}
+          <Stack spacing={1} alignItems="flex-end">
+            {/* First Row of Bubbles */}
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
+              {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
+              {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
+              {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
+            </Stack>
+
+            {/* Second Row of Bubbles */}
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
+              {details.location && (
+                <Chip label={`Location: ${details.location}`} size="small" color="default" variant="outlined" />
+              )}
+              {details?.ilo && (
+                <Chip 
+                  label={`iLO: ${details.ilo}`} 
+                  size="small" 
+                  color="info" 
+                  variant="outlined" 
+                  component="a" 
+                  href={`https://${details.ilo}`} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  clickable 
+                />
+              )}
+            </Stack>
           </Stack>
         )}
       </DialogTitle>
