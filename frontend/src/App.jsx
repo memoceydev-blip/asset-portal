@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   AppBar,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
@@ -42,9 +43,11 @@ import DashboardIcon from "@mui/icons-material/Dashboard";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
+import FileDownloadIcon from "@mui/icons-material/FileDownload";
 import { DataGrid } from "@mui/x-data-grid";
 import { PieChart } from "@mui/x-charts/PieChart";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import { api } from "./api";
 
 // ==========================================
@@ -604,6 +607,16 @@ export default function App({ mode, onToggleColorMode }) {
     return () => controller.abort();
   }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView]);
 
+  // Export current assets view set to Excel
+  const handleExportAssetsExcel = () => {
+    if (!assetRows || assetRows.length === 0) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(assetRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
+    XLSX.writeFile(workbook, "assets_export.xlsx");
+  };
+
   // ------------------------------------------
   // SOFTWARES VIEW STATE & EFFECTS
   // ------------------------------------------
@@ -682,6 +695,16 @@ export default function App({ mode, onToggleColorMode }) {
     loadSoftwares();
     return () => controller.abort();
   }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView]);
+
+  // Export current software view set to Excel
+  const handleExportSoftwaresExcel = () => {
+    if (!softwareRows || softwareRows.length === 0) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(softwareRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Softwares");
+    XLSX.writeFile(workbook, "softwares_export.xlsx");
+  };
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
@@ -829,9 +852,10 @@ export default function App({ mode, onToggleColorMode }) {
         
         {currentView === "assets" && (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 550, display: "flex", gap: 2, alignItems: "center" }}>
               <TextField
                 fullWidth
+                size="small"
                 label="Search Assets"
                 value={assetSearch}
                 onChange={(e) => {
@@ -839,6 +863,16 @@ export default function App({ mode, onToggleColorMode }) {
                   setAssetSearch(e.target.value);
                 }}
               />
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<FileDownloadIcon />}
+                onClick={handleExportAssetsExcel}
+                disabled={!assetRows || assetRows.length === 0}
+                sx={{ whiteSpace: "nowrap" }}
+              >
+                Export Excel
+              </Button>
             </Paper>
 
             <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
@@ -871,7 +905,7 @@ export default function App({ mode, onToggleColorMode }) {
         {currentView === "softwares" && (
           <>
             <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
                 <TextField
                   size="small"
                   label="Search Name"
@@ -912,6 +946,16 @@ export default function App({ mode, onToggleColorMode }) {
                   }}
                   sx={{ flex: 1 }}
                 />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<FileDownloadIcon />}
+                  onClick={handleExportSoftwaresExcel}
+                  disabled={!softwareRows || softwareRows.length === 0}
+                  sx={{ whiteSpace: "nowrap" }}
+                >
+                  Export Excel
+                </Button>
               </Stack>
             </Paper>
 
