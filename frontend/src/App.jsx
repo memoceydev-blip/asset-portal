@@ -452,6 +452,8 @@ export default function App({ mode, onToggleColorMode }) {
   const [assetRowCount, setAssetRowCount] = useState(0);
   const [assetSearch, setAssetSearch] = useState("");
   const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
+  const [assetColumnFilters, setAssetColumnFilters] = useState({});
+  const [debouncedAssetColumnFilters, setDebouncedAssetColumnFilters] = useState({});
   const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
 
@@ -460,20 +462,59 @@ export default function App({ mode, onToggleColorMode }) {
     return () => clearTimeout(delayHandler);
   }, [assetSearch]);
 
+  // Debounce individual column filters
+  useEffect(() => {
+    const delayHandler = setTimeout(() => {
+      setDebouncedAssetColumnFilters(assetColumnFilters);
+    }, 400);
+    return () => clearTimeout(delayHandler);
+  }, [assetColumnFilters]);
+
+  const handleColumnFilterChange = (field, value) => {
+    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+    setAssetColumnFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const createHeaderWithFilter = (label, field) => {
+    return () => (
+      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+          {label}
+        </Typography>
+        <TextField
+          size="small"
+          placeholder="Filter..."
+          variant="outlined"
+          value={assetColumnFilters[field] || ""}
+          onClick={(e) => e.stopPropagation()} // Stop column sorting click from firing when typing
+          onChange={(e) => handleColumnFilterChange(field, e.target.value)}
+          inputProps={{
+            style: { padding: "2px 6px", fontSize: "0.75rem" },
+          }}
+          sx={{ bgcolor: "background.paper" }}
+        />
+      </Box>
+    );
+  };
+
   const assetColumns = useMemo(
     () => [
-      { field: "id", headerName: "ID", flex: 0.6 },
-      { field: "name", headerName: "Name", flex: 1.2 },
-      { field: "tag", headerName: "Tag", flex: 1 },
-      { field: "type", headerName: "Type", flex: 1 },
-      { field: "owner", headerName: "Owner", flex: 1.1 },
-      { field: "location", headerName: "Location", flex: 1.1 },
-      { field: "os", headerName: "OS", flex: 1.1 },
-      { field: "status", headerName: "Status", flex: 0.9 },
+      { field: "id", headerName: "ID", flex: 0.8, renderHeader: createHeaderWithFilter("ID", "id") },
+      { field: "name", headerName: "Name", flex: 1.2, renderHeader: createHeaderWithFilter("Name", "name") },
+      { field: "tag", headerName: "Tag", flex: 1, renderHeader: createHeaderWithFilter("Tag", "tag") },
+      { field: "type", headerName: "Type", flex: 1, renderHeader: createHeaderWithFilter("Type", "type") },
+      { field: "owner", headerName: "Owner", flex: 1.1, renderHeader: createHeaderWithFilter("Owner", "owner") },
+      { field: "location", headerName: "Location", flex: 1.1, renderHeader: createHeaderWithFilter("Location", "location") },
+      { field: "os", headerName: "OS", flex: 1.1, renderHeader: createHeaderWithFilter("OS", "os") },
+      { field: "status", headerName: "Status", flex: 0.9, renderHeader: createHeaderWithFilter("Status", "status") },
       { 
         field: "power_state", 
         headerName: "Power State", 
         flex: 1.1,
+        renderHeader: createHeaderWithFilter("Power State", "power_state"),
         renderCell: (params) => {
           const cfg = getPowerStateConfig(params.value);
           return (
@@ -491,10 +532,10 @@ export default function App({ mode, onToggleColorMode }) {
           );
         }
       },
-      { field: "ips", headerName: "IPs", flex: 1.3 },
-      { field: "alias", headerName: "Alias", flex: 1.2 },
+      { field: "ips", headerName: "IPs", flex: 1.3, renderHeader: createHeaderWithFilter("IPs", "ips") },
+      { field: "alias", headerName: "Alias", flex: 1.2, renderHeader: createHeaderWithFilter("Alias", "alias") },
     ],
-    []
+    [assetColumnFilters]
   );
 
   useEffect(() => {
@@ -507,6 +548,14 @@ export default function App({ mode, onToggleColorMode }) {
         const sortBy = assetSortModel[0]?.field || "id";
         const sortDir = assetSortModel[0]?.sort || "asc";
 
+        // Map column filters into params object formatted with `{field}_filter`
+        const filterParams = {};
+        Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
+          if (val && val.trim() !== "") {
+            filterParams[`${field}_filter`] = val.trim();
+          }
+        });
+
         const response = await api.get("/api/v1/assets", {
           signal: controller.signal,
           params: {
@@ -515,6 +564,7 @@ export default function App({ mode, onToggleColorMode }) {
             sort_by: sortBy,
             sort_dir: sortDir,
             search: debouncedAssetSearch || undefined,
+            ...filterParams,
           },
         });
 
@@ -532,7 +582,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadAssets();
     return () => controller.abort();
-  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, currentView]);
+  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView]);
 
   // ------------------------------------------
   // SOFTWARES VIEW STATE & EFFECTS
@@ -773,6 +823,7 @@ export default function App({ mode, onToggleColorMode }) {
 
             <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
               <DataGrid
+                columnHeaderHeight={70}
                 rows={assetRows}
                 columns={assetColumns}
                 loading={assetLoading}
