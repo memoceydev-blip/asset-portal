@@ -44,6 +44,7 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
 import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import { DataGrid } from "@mui/x-data-grid";
 import { PieChart } from "@mui/x-charts/PieChart";
 import axios from "axios";
@@ -246,6 +247,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 <Tab label="Machine" />
                 <Tab label="Network" />
                 <Tab label="Softwares" />
+                <Tab label="Agent Status" />
               </Tabs>
 
               {/* TAB 0: MACHINE PANELS */}
@@ -285,7 +287,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
                   <Divider variant="dashed" />
 
-                  {/* Added Section: User Access Metrics */}
+                  {/* Section: User Access Metrics */}
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                       Registered Users
@@ -398,6 +400,43 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   )}
                 </Box>
               )}
+
+              {/* TAB 3: AGENT STATUS PANEL */}
+              {tabValue === 3 && (
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                    Monitored Agents
+                  </Typography>
+                  {details.agents?.length ? (
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
+                      <Table size="small" stickyHeader aria-label="Agent status list">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {details.agents.map((agent, index) => (
+                            <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
+                              <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
+                              <TableCell>{agent.agent_status || "-"}</TableCell>
+                              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                {agent.agent_last || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Typography color="text.secondary" variant="body2">
+                      No agent status information available.
+                    </Typography>
+                  )}
+                </Box>
+              )}
             </Box>
           </Stack>
         )}
@@ -412,8 +451,8 @@ AssetDetailsModal.propTypes = {
   onClose: PropTypes.func.isRequired,
 };
 
-// Common Fancy Export Button Styling Configuration
-const exportButtonSx = {
+// Common Action Button Styling Configuration
+const actionButtonSx = {
   borderRadius: 2,
   px: 2.5,
   py: 0.8,
@@ -521,6 +560,13 @@ export default function App({ mode, onToggleColorMode }) {
       ...prev,
       [field]: value,
     }));
+  };
+
+  // Helper to clear both search box and column filter textboxes
+  const handleClearAssetFilters = () => {
+    setAssetSearch("");
+    setAssetColumnFilters({});
+    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
   };
 
   const createHeaderWithFilter = (label, field) => {
@@ -638,6 +684,12 @@ export default function App({ mode, onToggleColorMode }) {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
     XLSX.writeFile(workbook, "assets_export.xlsx");
   };
+
+  // Check if any filters are active to disable/enable Clear button
+  const hasActiveAssetFilters = useMemo(() => {
+    if (assetSearch.trim() !== "") return true;
+    return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
+  }, [assetSearch, assetColumnFilters]);
 
   // ------------------------------------------
   // SOFTWARES VIEW STATE & EFFECTS
@@ -874,7 +926,7 @@ export default function App({ mode, onToggleColorMode }) {
         
         {currentView === "assets" && (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 580, display: "flex", gap: 2, alignItems: "center" }}>
+            <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
               <TextField
                 fullWidth
                 size="small"
@@ -890,9 +942,28 @@ export default function App({ mode, onToggleColorMode }) {
                 startIcon={<FileDownloadOutlinedIcon />}
                 onClick={handleExportAssetsExcel}
                 disabled={!assetRows || assetRows.length === 0}
-                sx={exportButtonSx}
+                sx={actionButtonSx}
               >
                 Export Excel
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<FilterAltOffOutlinedIcon />}
+                onClick={handleClearAssetFilters}
+                disabled={!hasActiveAssetFilters}
+                sx={{
+                  ...actionButtonSx,
+                  "&:hover": {
+                    bgcolor: "error.main",
+                    color: "error.contrastText",
+                    borderColor: "error.main",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    transform: "translateY(-1px)",
+                  },
+                }}
+              >
+                Clear Filters
               </Button>
             </Paper>
 
@@ -972,7 +1043,7 @@ export default function App({ mode, onToggleColorMode }) {
                   startIcon={<FileDownloadOutlinedIcon />}
                   onClick={handleExportSoftwaresExcel}
                   disabled={!softwareRows || softwareRows.length === 0}
-                  sx={exportButtonSx}
+                  sx={actionButtonSx}
                 >
                   Export Excel
                 </Button>
