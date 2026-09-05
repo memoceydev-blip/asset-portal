@@ -533,6 +533,7 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   const [assetRows, setAssetRows] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
+  const [assetExporting, setAssetExporting] = useState(false);
   const [assetRowCount, setAssetRowCount] = useState(0);
   const [assetSearch, setAssetSearch] = useState("");
   const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
@@ -675,14 +676,44 @@ export default function App({ mode, onToggleColorMode }) {
     return () => controller.abort();
   }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView]);
 
-  // Export current assets view set to Excel
-  const handleExportAssetsExcel = () => {
-    if (!assetRows || assetRows.length === 0) return;
+  // Export ENTIRE assets dataset matching current filters to Excel
+  const handleExportAssetsExcel = async () => {
+    setAssetExporting(true);
+    try {
+      const sortBy = assetSortModel[0]?.field || "id";
+      const sortDir = assetSortModel[0]?.sort || "asc";
 
-    const worksheet = XLSX.utils.json_to_sheet(assetRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
-    XLSX.writeFile(workbook, "assets_export.xlsx");
+      const filterParams = {};
+      Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
+        if (val && val.trim() !== "") {
+          filterParams[`${field}_filter`] = val.trim();
+        }
+      });
+
+      // Query full dataset without page limits
+      const response = await api.get("/api/v1/assets", {
+        params: {
+          page: 1,
+          page_size: 100000, // Large size to fetch complete dataset
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          search: debouncedAssetSearch || undefined,
+          ...filterParams,
+        },
+      });
+
+      const fullItems = response.data?.items || [];
+      if (fullItems.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(fullItems);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Assets");
+      XLSX.writeFile(workbook, "assets_full_export.xlsx");
+    } catch (error) {
+      console.error("Error fetching full assets set for export:", error);
+    } finally {
+      setAssetExporting(false);
+    }
   };
 
   // Check if any filters are active to disable/enable Clear button
@@ -696,6 +727,7 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
+  const [softwareExporting, setSoftwareExporting] = useState(false);
   const [softwareRowCount, setSoftwareRowCount] = useState(0);
   const [softwarePaginationModel, setSoftwarePaginationModel] = useState({ page: 0, pageSize: 50 });
   const [softwareSortModel, setSoftwareSortModel] = useState([{ field: "name", sort: "asc" }]);
@@ -770,14 +802,38 @@ export default function App({ mode, onToggleColorMode }) {
     return () => controller.abort();
   }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView]);
 
-  // Export current software view set to Excel
-  const handleExportSoftwaresExcel = () => {
-    if (!softwareRows || softwareRows.length === 0) return;
+  // Export ENTIRE software dataset matching current filters to Excel
+  const handleExportSoftwaresExcel = async () => {
+    setSoftwareExporting(true);
+    try {
+      const sortBy = softwareSortModel[0]?.field || "name";
+      const sortDir = softwareSortModel[0]?.sort || "asc";
 
-    const worksheet = XLSX.utils.json_to_sheet(softwareRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Softwares");
-    XLSX.writeFile(workbook, "softwares_export.xlsx");
+      const response = await api.get("/api/v1/softwares", {
+        params: {
+          page: 1,
+          page_size: 100000, // Large size to fetch complete dataset
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          name: debouncedSwFilters.name || undefined,
+          version: debouncedSwFilters.version || undefined,
+          os: debouncedSwFilters.os || undefined,
+          owner: debouncedSwFilters.owner || undefined,
+        },
+      });
+
+      const fullItems = response.data?.items || [];
+      if (fullItems.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(fullItems);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Softwares");
+      XLSX.writeFile(workbook, "softwares_full_export.xlsx");
+    } catch (error) {
+      console.error("Error fetching full software set for export:", error);
+    } finally {
+      setSoftwareExporting(false);
+    }
   };
 
   return (
@@ -941,10 +997,10 @@ export default function App({ mode, onToggleColorMode }) {
                 variant="outlined"
                 startIcon={<FileDownloadOutlinedIcon />}
                 onClick={handleExportAssetsExcel}
-                disabled={!assetRows || assetRows.length === 0}
+                disabled={assetExporting || assetRowCount === 0}
                 sx={actionButtonSx}
               >
-                Export Excel
+                {assetExporting ? "Exporting..." : "Export Excel"}
               </Button>
               <Button
                 variant="outlined"
@@ -1042,10 +1098,10 @@ export default function App({ mode, onToggleColorMode }) {
                   variant="outlined"
                   startIcon={<FileDownloadOutlinedIcon />}
                   onClick={handleExportSoftwaresExcel}
-                  disabled={!softwareRows || softwareRows.length === 0}
+                  disabled={softwareExporting || softwareRowCount === 0}
                   sx={actionButtonSx}
                 >
-                  Export Excel
+                  {softwareExporting ? "Exporting..." : "Export Excel"}
                 </Button>
               </Stack>
             </Paper>
