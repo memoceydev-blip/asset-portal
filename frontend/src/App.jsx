@@ -517,6 +517,13 @@ export default function App({ mode, onToggleColorMode }) {
   const [vmLocationLoading, setVmLocationLoading] = useState(false);
   const [vmLocationError, setVmLocationError] = useState(null);
 
+  // 6. Bare Metal (BM) Location Stats
+  const [bmGroup, setBmGroup] = useState("pod");
+  const [bmLocationRawItems, setBmLocationRawItems] = useState([]);
+  const [bmLocationChartData, setBmLocationChartData] = useState([]);
+  const [bmLocationLoading, setBmLocationLoading] = useState(false);
+  const [bmLocationError, setBmLocationError] = useState(null);
+
   useEffect(() => {
     if (currentView !== "summary") return;
 
@@ -555,9 +562,13 @@ export default function App({ mode, onToggleColorMode }) {
       asset_type: "vm",
       group_by: vmGroup,
     });
+    fetchStat("/api/v1/stats/locations", setBmLocationRawItems, setBmLocationChartData, setBmLocationLoading, setBmLocationError, "Unknown Location", {
+      asset_type: "bm",
+      group_by: bmGroup,
+    });
 
     return () => controller.abort();
-  }, [currentView, vmGroup]);
+  }, [currentView, vmGroup, bmGroup]);
 
   // ------------------------------------------
   // ASSETS VIEW STATE & EFFECTS
@@ -1080,6 +1091,30 @@ export default function App({ mode, onToggleColorMode }) {
                 >
                   <ToggleButton value="vcenter">vCenter</ToggleButton>
                   <ToggleButton value="cluster">Cluster</ToggleButton>
+                </ToggleButtonGroup>
+              )}
+            </Grid>
+
+            {/* ROW 3 - Card 6: Bare Metal (BM) Locations */}
+            <Grid item xs={12} md={6}>
+              {renderStatCard(
+                "Bare Metal Location Distribution",
+                `Bare metal counts grouped by ${bmGroup}.`,
+                bmGroup === "pod" ? "Pod" : bmGroup === "cabine" ? "Cabine" : "Site",
+                bmLocationLoading,
+                bmLocationError,
+                bmLocationChartData,
+                bmLocationRawItems,
+                <ToggleButtonGroup
+                  size="small"
+                  value={bmGroup}
+                  exclusive
+                  onChange={(_, val) => val && setBmGroup(val)}
+                  aria-label="Group Bare Metal Location By"
+                >
+                  <ToggleButton value="pod">Pod</ToggleButton>
+                  <ToggleButton value="cabine">Cabine</ToggleButton>
+                  <ToggleButton value="site">Site</ToggleButton>
                 </ToggleButtonGroup>
               )}
             </Grid>
