@@ -32,6 +32,8 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Toolbar,
   Tooltip,
   Typography,
@@ -508,17 +510,23 @@ export default function App({ mode, onToggleColorMode }) {
   const [assetTypeLoading, setAssetTypeLoading] = useState(false);
   const [assetTypeError, setAssetTypeError] = useState(null);
 
+  // 5. VM Location Stats
+  const [vmGroup, setVmGroup] = useState("vcenter");
+  const [vmLocationRawItems, setVmLocationRawItems] = useState([]);
+  const [vmLocationChartData, setVmLocationChartData] = useState([]);
+  const [vmLocationLoading, setVmLocationLoading] = useState(false);
+  const [vmLocationError, setVmLocationError] = useState(null);
+
   useEffect(() => {
     if (currentView !== "summary") return;
 
     const controller = new AbortController();
 
-    // Helper to fetch stat endpoints cleanly
-    const fetchStat = async (url, setRaw, setChart, setLoading, setError, defaultLabel) => {
+    const fetchStat = async (url, setRaw, setChart, setLoading, setError, defaultLabel, extraParams = {}) => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get(url, { signal: controller.signal });
+        const response = await api.get(url, { signal: controller.signal, params: extraParams });
         const items = response.data?.items || [];
         setRaw(items);
         
@@ -543,9 +551,13 @@ export default function App({ mode, onToggleColorMode }) {
     fetchStat("/api/v1/stats/vendor", setVendorRawItems, setVendorChartData, setVendorLoading, setVendorError, "Unknown Vendor");
     fetchStat("/api/v1/stats/product", setProductRawItems, setProductChartData, setProductLoading, setProductError, "Unknown Product");
     fetchStat("/api/v1/stats/asset_types", setAssetTypeRawItems, setAssetTypeChartData, setAssetTypeLoading, setAssetTypeError, "Unknown Asset Type");
+    fetchStat("/api/v1/stats/locations", setVmLocationRawItems, setVmLocationChartData, setVmLocationLoading, setVmLocationError, "Unknown Location", {
+      asset_type: "vm",
+      group_by: vmGroup,
+    });
 
     return () => controller.abort();
-  }, [currentView]);
+  }, [currentView, vmGroup]);
 
   // ------------------------------------------
   // ASSETS VIEW STATE & EFFECTS
@@ -849,15 +861,20 @@ export default function App({ mode, onToggleColorMode }) {
   };
 
   // Helper render for Summary Card Items
-  const renderStatCard = (title, subtitle, tableHeader, loading, error, chartData, rawItems) => (
+  const renderStatCard = (title, subtitle, tableHeader, loading, error, chartData, rawItems, headerAction = null) => (
     <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
       <CardContent>
-        <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
-          {title}
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-          {subtitle}
-        </Typography>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
+          <Box>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+              {title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              {subtitle}
+            </Typography>
+          </Box>
+          {headerAction}
+        </Stack>
 
         {loading && (
           <Box sx={{ width: "100%", py: 6 }}>
@@ -992,7 +1009,7 @@ export default function App({ mode, onToggleColorMode }) {
       <Container maxWidth={false} sx={{ py: 3 }}>
         {currentView === "summary" && (
           <Grid container spacing={3}>
-            {/* Card 1: Operating Systems */}
+            {/* ROW 1 - Card 1: Operating Systems */}
             <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Operating Systems Distribution",
@@ -1005,7 +1022,7 @@ export default function App({ mode, onToggleColorMode }) {
               )}
             </Grid>
 
-            {/* Card 2: Server Manufacturer / Vendor */}
+            {/* ROW 1 - Card 2: Server Manufacturer / Vendor */}
             <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Vendor / Manufacturer Breakdown",
@@ -1018,7 +1035,7 @@ export default function App({ mode, onToggleColorMode }) {
               )}
             </Grid>
 
-            {/* Card 3: Server Product Model */}
+            {/* ROW 2 - Card 3: Server Product Model */}
             <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Product Model Breakdown",
@@ -1031,7 +1048,7 @@ export default function App({ mode, onToggleColorMode }) {
               )}
             </Grid>
 
-            {/* Card 4: Asset Types */}
+            {/* ROW 2 - Card 4: Asset Types */}
             <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Asset Types Breakdown",
@@ -1041,6 +1058,29 @@ export default function App({ mode, onToggleColorMode }) {
                 assetTypeError,
                 assetTypeChartData,
                 assetTypeRawItems
+              )}
+            </Grid>
+
+            {/* ROW 3 - Card 5: VM Locations */}
+            <Grid item xs={12} md={6}>
+              {renderStatCard(
+                "VM Location Distribution",
+                `Virtual machine counts grouped by ${vmGroup === "vcenter" ? "vCenter Server" : "Cluster"}.`,
+                vmGroup === "vcenter" ? "vCenter" : "Cluster",
+                vmLocationLoading,
+                vmLocationError,
+                vmLocationChartData,
+                vmLocationRawItems,
+                <ToggleButtonGroup
+                  size="small"
+                  value={vmGroup}
+                  exclusive
+                  onChange={(_, val) => val && setVmGroup(val)}
+                  aria-label="Group VM Location By"
+                >
+                  <ToggleButton value="vcenter">vCenter</ToggleButton>
+                  <ToggleButton value="cluster">Cluster</ToggleButton>
+                </ToggleButtonGroup>
               )}
             </Grid>
           </Grid>
