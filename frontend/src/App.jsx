@@ -1100,7 +1100,7 @@ export default function App({ mode, onToggleColorMode }) {
               {renderStatCard(
                 "Bare Metal Location Distribution",
                 `Bare metal counts grouped by ${bmGroup}.`,
-                bmGroup === "pod" ? "Pod" : bmGroup === "cabine" ? "Cabine" : "Site",
+                bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site",
                 bmLocationLoading,
                 bmLocationError,
                 bmLocationChartData,
@@ -1113,7 +1113,7 @@ export default function App({ mode, onToggleColorMode }) {
                   aria-label="Group Bare Metal Location By"
                 >
                   <ToggleButton value="pod">Pod</ToggleButton>
-                  <ToggleButton value="cabine">Cabine</ToggleButton>
+                  <ToggleButton value="cabinet">Cabinet</ToggleButton>
                   <ToggleButton value="site">Site</ToggleButton>
                 </ToggleButtonGroup>
               )}
