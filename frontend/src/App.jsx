@@ -179,14 +179,12 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
         {!loading && details && (
           <Stack spacing={1} alignItems="flex-end">
-            {/* First Row of Bubbles */}
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
               {details.name && <Chip label={`Name: ${details.name}`} size="small" color="primary" variant="outlined" />}
               {details.tag && <Chip label={`Tag: ${details.tag}`} size="small" color="secondary" variant="outlined" />}
               {details.owner && <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />}
             </Stack>
 
-            {/* Second Row of Bubbles */}
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
               {details.location && (
                 <Chip label={`Location: ${details.location}`} size="small" color="default" variant="outlined" />
@@ -220,7 +218,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
         {!loading && !error && details && (
           <Stack spacing={3} sx={{ flex: 1 }}>
-            {/* Base Header Section: Aliases always visible */}
             <Box>
               <Typography variant="h6" gutterBottom>
                 Aliases
@@ -236,7 +233,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
             <Divider />
 
-            {/* Reorganized Tab Layout */}
             <Box sx={{ width: "100%" }}>
               <Tabs 
                 value={tabValue} 
@@ -287,7 +283,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
                   <Divider variant="dashed" />
 
-                  {/* Section: User Access Metrics */}
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                       Registered Users
@@ -489,42 +484,59 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   // SUMMARY / STATS STATE & EFFECTS
   // ------------------------------------------
+  // 1. OS Stats
   const [osRawItems, setOsRawItems] = useState([]);
   const [osChartData, setOsChartData] = useState([]);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsError, setStatsError] = useState(null);
+  const [osLoading, setOsLoading] = useState(false);
+  const [osError, setOsError] = useState(null);
+
+  // 2. Vendor Stats
+  const [vendorRawItems, setVendorRawItems] = useState([]);
+  const [vendorChartData, setVendorChartData] = useState([]);
+  const [vendorLoading, setVendorLoading] = useState(false);
+  const [vendorError, setVendorError] = useState(null);
+
+  // 3. Product Stats
+  const [productRawItems, setProductRawItems] = useState([]);
+  const [productChartData, setProductChartData] = useState([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [productError, setProductError] = useState(null);
 
   useEffect(() => {
     if (currentView !== "summary") return;
 
     const controller = new AbortController();
-    const loadStats = async () => {
-      setStatsLoading(true);
-      setStatsError(null);
+
+    // Helper to fetch stat endpoints cleanly
+    const fetchStat = async (url, setRaw, setChart, setLoading, setError, defaultLabel) => {
+      setLoading(true);
+      setError(null);
       try {
-        const response = await api.get("/api/v1/stats/os");
+        const response = await api.get(url, { signal: controller.signal });
         const items = response.data?.items || [];
+        setRaw(items);
         
-        setOsRawItems(items);
-        
-        const formattedChartData = items.map((item, index) => ({
+        const formattedChart = items.map((item, index) => ({
           id: index,
           value: item.count,
-          label: item.name || "Unknown OS",
+          label: item.name || defaultLabel,
         }));
-        setOsChartData(formattedChartData);
-      } catch (error) {
-        if (axios.isCancel(error) || error.name === "CanceledError") return;
-        console.error("Error loading OS distribution statistics:", error);
-        setStatsError("Failed to load metrics summaries.");
+        setChart(formattedChart);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error(`Error loading stat metrics from ${url}:`, err);
+        setError("Failed to load metrics summary.");
       } finally {
         if (!controller.signal.aborted) {
-          setStatsLoading(false);
+          setLoading(false);
         }
       }
     };
 
-    loadStats();
+    fetchStat("/api/v1/stats/os", setOsRawItems, setOsChartData, setOsLoading, setOsError, "Unknown OS");
+    fetchStat("/api/v1/stats/vendor", setVendorRawItems, setVendorChartData, setVendorLoading, setVendorError, "Unknown Vendor");
+    fetchStat("/api/v1/stats/product", setProductRawItems, setProductChartData, setProductLoading, setProductError, "Unknown Product");
+
     return () => controller.abort();
   }, [currentView]);
 
@@ -547,7 +559,6 @@ export default function App({ mode, onToggleColorMode }) {
     return () => clearTimeout(delayHandler);
   }, [assetSearch]);
 
-  // Debounce individual column filters
   useEffect(() => {
     const delayHandler = setTimeout(() => {
       setDebouncedAssetColumnFilters(assetColumnFilters);
@@ -563,7 +574,6 @@ export default function App({ mode, onToggleColorMode }) {
     }));
   };
 
-  // Helper to clear both search box and column filter textboxes
   const handleClearAssetFilters = () => {
     setAssetSearch("");
     setAssetColumnFilters({});
@@ -581,7 +591,7 @@ export default function App({ mode, onToggleColorMode }) {
           placeholder="Filter..."
           variant="outlined"
           value={assetColumnFilters[field] || ""}
-          onClick={(e) => e.stopPropagation()} // Stop column sorting click from firing when typing
+          onClick={(e) => e.stopPropagation()}
           onChange={(e) => handleColumnFilterChange(field, e.target.value)}
           inputProps={{
             style: { padding: "2px 6px", fontSize: "0.75rem" },
@@ -640,7 +650,6 @@ export default function App({ mode, onToggleColorMode }) {
         const sortBy = assetSortModel[0]?.field || "id";
         const sortDir = assetSortModel[0]?.sort || "asc";
 
-        // Map column filters into params object formatted with `{field}_filter`
         const filterParams = {};
         Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
           if (val && val.trim() !== "") {
@@ -676,7 +685,6 @@ export default function App({ mode, onToggleColorMode }) {
     return () => controller.abort();
   }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView]);
 
-  // Export ENTIRE assets dataset matching current filters to Excel
   const handleExportAssetsExcel = async () => {
     setAssetExporting(true);
     try {
@@ -690,11 +698,10 @@ export default function App({ mode, onToggleColorMode }) {
         }
       });
 
-      // Query full dataset without page limits
       const response = await api.get("/api/v1/assets", {
         params: {
           page: 1,
-          page_size: 100000, // Large size to fetch complete dataset
+          page_size: 100000,
           sort_by: sortBy,
           sort_dir: sortDir,
           search: debouncedAssetSearch || undefined,
@@ -716,7 +723,6 @@ export default function App({ mode, onToggleColorMode }) {
     }
   };
 
-  // Check if any filters are active to disable/enable Clear button
   const hasActiveAssetFilters = useMemo(() => {
     if (assetSearch.trim() !== "") return true;
     return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
@@ -802,7 +808,6 @@ export default function App({ mode, onToggleColorMode }) {
     return () => controller.abort();
   }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView]);
 
-  // Export ENTIRE software dataset matching current filters to Excel
   const handleExportSoftwaresExcel = async () => {
     setSoftwareExporting(true);
     try {
@@ -812,7 +817,7 @@ export default function App({ mode, onToggleColorMode }) {
       const response = await api.get("/api/v1/softwares", {
         params: {
           page: 1,
-          page_size: 100000, // Large size to fetch complete dataset
+          page_size: 100000,
           sort_by: sortBy,
           sort_dir: sortDir,
           name: debouncedSwFilters.name || undefined,
@@ -835,6 +840,90 @@ export default function App({ mode, onToggleColorMode }) {
       setSoftwareExporting(false);
     }
   };
+
+  // Helper render for Summary Card Items
+  const renderStatCard = (title, subtitle, tableHeader, loading, error, chartData, rawItems) => (
+    <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
+      <CardContent>
+        <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          {subtitle}
+        </Typography>
+
+        {loading && (
+          <Box sx={{ width: "100%", py: 6 }}>
+            <LinearProgress />
+          </Box>
+        )}
+
+        {error && !loading && (
+          <Typography color="error" align="center" sx={{ py: 4 }}>
+            {error}
+          </Typography>
+        )}
+
+        {!loading && !error && chartData.length === 0 && (
+          <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+            No telemetry records found.
+          </Typography>
+        )}
+
+        {!loading && !error && chartData.length > 0 && (
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
+              <Box sx={{ width: "100%", maxWidth: 280, height: 240 }}>
+                <PieChart
+                  series={[
+                    {
+                      data: chartData,
+                      innerRadius: 40,
+                      outerRadius: 90,
+                      paddingAngle: 3,
+                      cornerRadius: 5,
+                      highlightScope: { faded: "blurred", highlighted: "onSeries" },
+                    },
+                  ]}
+                  height={230}
+                  slotProps={{
+                    legend: { hidden: true },
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={7}>
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 280, overflow: "auto" }}>
+                <Table stickyHeader size="small" aria-label={`${title} counts table`}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>{tableHeader}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}>
+                        Count
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rawItems.map((row, index) => (
+                      <TableRow key={`${row.name || "item"}-${index}`} hover>
+                        <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                          {row.name || "Unknown"}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}>
+                          {row.count?.toLocaleString() || 0}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Grid>
+          </Grid>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
@@ -894,88 +983,45 @@ export default function App({ mode, onToggleColorMode }) {
 
       {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
-        
         {currentView === "summary" && (
           <Grid container spacing={3}>
-            <Grid item xs={12} lg={10}>
-              <Card sx={{ bgcolor: "background.paper", p: 1 }}>
-                <CardContent>
-                  <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 1 }}>
-                    Operating Systems Distribution
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                    Live telemetry representation breakdown mapping infrastructure platform ratios.
-                  </Typography>
+            {/* Card 1: Operating Systems */}
+            <Grid item xs={12} lg={6} xl={4}>
+              {renderStatCard(
+                "Operating Systems Distribution",
+                "Breakdown of operating system distribution metrics across infrastructure.",
+                "Operating System",
+                osLoading,
+                osError,
+                osChartData,
+                osRawItems
+              )}
+            </Grid>
 
-                  {statsLoading && (
-                    <Box sx={{ width: "100%", py: 6 }}>
-                      <LinearProgress />
-                    </Box>
-                  )}
+            {/* Card 2: Server Manufacturer / Vendor */}
+            <Grid item xs={12} lg={6} xl={4}>
+              {renderStatCard(
+                "Vendor / Manufacturer Breakdown",
+                "Hardware manufacturer distribution across server nodes.",
+                "Vendor / Manufacturer",
+                vendorLoading,
+                vendorError,
+                vendorChartData,
+                vendorRawItems
+              )}
+            </Grid>
 
-                  {statsError && !statsLoading && (
-                    <Typography color="error" align="center" sx={{ py: 4 }}>
-                      {statsError}
-                    </Typography>
-                  )}
-
-                  {!statsLoading && !statsError && osChartData.length === 0 && (
-                    <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
-                      No operating system metrics available.
-                    </Typography>
-                  )}
-
-                  {!statsLoading && !statsError && osChartData.length > 0 && (
-                    <Grid container spacing={4} alignItems="center">
-                      <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
-                        <Box sx={{ width: "100%", maxWidth: 300, height: 260 }}>
-                          <PieChart
-                            series={[
-                              {
-                                data: osChartData,
-                                innerRadius: 50,
-                                outerRadius: 100,
-                                paddingAngle: 3,
-                                cornerRadius: 5,
-                                highlightScope: { faded: 'blurred', highlighted: 'onSeries' },
-                              },
-                            ]}
-                            height={250}
-                            slotProps={{
-                              legend: { hidden: true }
-                            }}
-                          />
-                        </Box>
-                      </Grid>
-
-                      <Grid item xs={12} md={7}>
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
-                          <Table stickyHeader size="small" aria-label="Operating Systems inventory counts">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Operating System</TableCell>
-                                <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 120 }}>Count</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {osRawItems.map((row, index) => (
-                                <TableRow key={`${row.name || "os"}-${index}`} hover>
-                                  <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
-                                    {row.name || "Unknown Operating System"}
-                                  </TableCell>
-                                  <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.95rem" }}>
-                                    {row.count.toLocaleString()}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </Grid>
-                    </Grid>
-                  )}
-                </CardContent>
-              </Card>
+            {/* Card 3: Server Product Model */}
+            <Grid item xs={12} lg={6} xl={4}>
+              {renderStatCard(
+                "Product Model Breakdown",
+                "Distribution across deployed hardware product lines.",
+                "Product Model",
+                productLoading,
+                productError,
+                productChartData,
+                productRawItems
+              )}
             </Grid>
           </Grid>
         )}
