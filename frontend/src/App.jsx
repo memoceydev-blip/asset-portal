@@ -502,6 +502,12 @@ export default function App({ mode, onToggleColorMode }) {
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState(null);
 
+  // 4. Asset Types Stats
+  const [assetTypeRawItems, setAssetTypeRawItems] = useState([]);
+  const [assetTypeChartData, setAssetTypeChartData] = useState([]);
+  const [assetTypeLoading, setAssetTypeLoading] = useState(false);
+  const [assetTypeError, setAssetTypeError] = useState(null);
+
   useEffect(() => {
     if (currentView !== "summary") return;
 
@@ -536,6 +542,7 @@ export default function App({ mode, onToggleColorMode }) {
     fetchStat("/api/v1/stats/os", setOsRawItems, setOsChartData, setOsLoading, setOsError, "Unknown OS");
     fetchStat("/api/v1/stats/vendor", setVendorRawItems, setVendorChartData, setVendorLoading, setVendorError, "Unknown Vendor");
     fetchStat("/api/v1/stats/product", setProductRawItems, setProductChartData, setProductLoading, setProductError, "Unknown Product");
+    fetchStat("/api/v1/stats/asset_types", setAssetTypeRawItems, setAssetTypeChartData, setAssetTypeLoading, setAssetTypeError, "Unknown Asset Type");
 
     return () => controller.abort();
   }, [currentView]);
@@ -986,7 +993,7 @@ export default function App({ mode, onToggleColorMode }) {
         {currentView === "summary" && (
           <Grid container spacing={3}>
             {/* Card 1: Operating Systems */}
-            <Grid item xs={12} lg={6} xl={4}>
+            <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Operating Systems Distribution",
                 "Breakdown of operating system distribution metrics across infrastructure.",
@@ -999,7 +1006,7 @@ export default function App({ mode, onToggleColorMode }) {
             </Grid>
 
             {/* Card 2: Server Manufacturer / Vendor */}
-            <Grid item xs={12} lg={6} xl={4}>
+            <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Vendor / Manufacturer Breakdown",
                 "Hardware manufacturer distribution across server nodes.",
@@ -1012,7 +1019,7 @@ export default function App({ mode, onToggleColorMode }) {
             </Grid>
 
             {/* Card 3: Server Product Model */}
-            <Grid item xs={12} lg={6} xl={4}>
+            <Grid item xs={12} md={6}>
               {renderStatCard(
                 "Product Model Breakdown",
                 "Distribution across deployed hardware product lines.",
@@ -1021,6 +1028,19 @@ export default function App({ mode, onToggleColorMode }) {
                 productError,
                 productChartData,
                 productRawItems
+              )}
+            </Grid>
+
+            {/* Card 4: Asset Types */}
+            <Grid item xs={12} md={6}>
+              {renderStatCard(
+                "Asset Types Breakdown",
+                "Distribution across registered asset classification types.",
+                "Asset Type",
+                assetTypeLoading,
+                assetTypeError,
+                assetTypeChartData,
+                assetTypeRawItems
               )}
             </Grid>
           </Grid>
