@@ -702,7 +702,7 @@ function AdminPage() {
                         label={
                           <Box sx={{ ml: 1 }}>
                             <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {role.label || role.name}
+                              {role.name || role.label}
                             </Typography>
                             {role.description && (
                               <Typography variant="caption" color="text.secondary">
