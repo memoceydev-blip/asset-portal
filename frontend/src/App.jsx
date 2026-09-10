@@ -508,7 +508,7 @@ function AdminPage() {
       setRolesLoading(true);
       try {
         const response = await api.get("/api/v1/security/roles", { signal: controller.signal });
-        setRoles(response.data?.roles || []);
+        setRoles(response.data?.items || response.data?.roles || []);
       } catch (err) {
         if (axios.isCancel(err) || err.name === "CanceledError") return;
         console.error("Error loading security roles:", err);
@@ -566,7 +566,7 @@ function AdminPage() {
           ? `/api/v1/security/users/${selectedTarget.id}/roles` 
           : `/api/v1/security/groups/${selectedTarget.id}/roles`;
         const response = await api.get(endpoint, { signal: controller.signal });
-        const assigned = response.data?.roles || response.data || [];
+        const assigned = response.data?.items || response.data?.roles || response.data || [];
         setAssignedRoleIds(assigned.map((r) => r.id));
       } catch (err) {
         if (axios.isCancel(err) || err.name === "CanceledError") return;
