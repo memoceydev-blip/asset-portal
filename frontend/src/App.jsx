@@ -1314,7 +1314,7 @@ export default function App({ mode, onToggleColorMode }) {
                 {/* ROW 3 - Card 5: VM Locations */}
                 <Grid item xs={12} md={6}>
                   {renderStatCard(
-                    "VM Location Distribution",
+                    "Virtual Machine Location Distribution",
                     `Virtual machine counts grouped by ${vmGroup === "vcenter" ? "vCenter Server" : "Cluster"}.`,
                     vmGroup === "vcenter" ? "vCenter" : "Cluster",
                     vmLocationLoading,
