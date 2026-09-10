@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   Container,
   Dialog,
@@ -13,6 +14,7 @@ import {
   DialogTitle,
   Divider,
   Drawer,
+  FormControlLabel,
   Grid,
   IconButton,
   LinearProgress,
@@ -43,6 +45,7 @@ import ComputerIcon from "@mui/icons-material/Computer";
 import SettingsApplicationsIcon from "@mui/icons-material/SettingsApplications";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import InventoryIcon from "@mui/icons-material/Inventory";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import PowerSettingsNewIcon from "@mui/icons-material/PowerSettingsNew";
@@ -62,6 +65,7 @@ const NAV_ITEMS = [
   { key: "assets", label: "Assets", icon: <ComputerIcon /> },
   { key: "softwares", label: "Softwares", icon: <SettingsApplicationsIcon /> },
   { key: "archived", label: "Archived", icon: <InventoryIcon /> },
+  { key: "admin", label: "Admin Users", icon: <AdminPanelSettingsIcon /> },
 ];
 
 // ==========================================
@@ -482,6 +486,246 @@ const actionButtonSx = {
 };
 
 // ==========================================
+// COMPONENT: Admin User & Role Manager Page
+// ==========================================
+function AdminPage() {
+  const [targetType, setTargetType] = useState("user"); // 'user' or 'group'
+  const [roles, setRoles] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState(null);
+  const [assignedRoleIds, setAssignedRoleIds] = useState([]);
+  
+  const [loading, setLoading] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch Roles List from Endpoint
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchRoles = async () => {
+      setRolesLoading(true);
+      try {
+        const response = await api.get("/api/v1/security/roles", { signal: controller.signal });
+        setRoles(response.data?.roles || []);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error loading security roles:", err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setRolesLoading(false);
+        }
+      }
+    };
+
+    fetchRoles();
+    return () => controller.abort();
+  }, []);
+
+  // Fetch Target List (Users / Groups)
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchTargets = async () => {
+      setLoading(true);
+      setError(null);
+      setSelectedTarget(null);
+      setAssignedRoleIds([]);
+      try {
+        const endpoint = targetType === "user" ? "/api/v1/security/users" : "/api/v1/security/groups";
+        const response = await api.get(endpoint, { signal: controller.signal });
+        if (targetType === "user") {
+          setUsers(response.data?.items || response.data || []);
+        } else {
+          setGroups(response.data?.items || response.data || []);
+        }
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error(`Error loading ${targetType}s:`, err);
+        setError(`Failed to fetch ${targetType}s list.`);
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTargets();
+    return () => controller.abort();
+  }, [targetType]);
+
+  // Fetch Assigned Roles for Selected Target
+  useEffect(() => {
+    if (!selectedTarget) return;
+
+    const controller = new AbortController();
+    const fetchAssignedRoles = async () => {
+      setActionLoading(true);
+      try {
+        const endpoint = targetType === "user" 
+          ? `/api/v1/security/users/${selectedTarget.id}/roles` 
+          : `/api/v1/security/groups/${selectedTarget.id}/roles`;
+        const response = await api.get(endpoint, { signal: controller.signal });
+        const assigned = response.data?.roles || response.data || [];
+        setAssignedRoleIds(assigned.map((r) => r.id));
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching assigned roles:", err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setActionLoading(false);
+        }
+      }
+    };
+
+    fetchAssignedRoles();
+    return () => controller.abort();
+  }, [selectedTarget, targetType]);
+
+  // Toggle Role Assignment (Add or Remove)
+  const handleRoleToggle = async (roleId, isAssigned) => {
+    if (!selectedTarget) return;
+    setActionLoading(true);
+
+    try {
+      const endpoint = targetType === "user"
+        ? `/api/v1/security/users/${selectedTarget.id}/roles/${roleId}`
+        : `/api/v1/security/groups/${selectedTarget.id}/roles/${roleId}`;
+
+      if (isAssigned) {
+        // Remove Role
+        await api.delete(endpoint);
+        setAssignedRoleIds((prev) => prev.filter((id) => id !== roleId));
+      } else {
+        // Add Role
+        await api.post(endpoint);
+        setAssignedRoleIds((prev) => [...prev, roleId]);
+      }
+    } catch (err) {
+      console.error("Error updating role assignment:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const targetList = targetType === "user" ? users : groups;
+
+  return (
+    <Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          User & Permission Administration
+        </Typography>
+        <ToggleButtonGroup
+          size="small"
+          value={targetType}
+          exclusive
+          onChange={(_, val) => val && setTargetType(val)}
+        >
+          <ToggleButton value="user">Users</ToggleButton>
+          <ToggleButton value="group">Groups</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+
+      <Grid container spacing={3}>
+        {/* Left Panel: Target Selection */}
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+              Select {targetType === "user" ? "User" : "Group"}
+            </Typography>
+
+            {loading && <LinearProgress sx={{ mb: 2 }} />}
+            {error && <Typography color="error" variant="body2">{error}</Typography>}
+
+            {!loading && !error && (
+              <List dense sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                {targetList.map((item) => {
+                  const isSelected = selectedTarget?.id === item.id;
+                  const label = item.name || item.username || item.label || `ID: ${item.id}`;
+                  const subLabel = item.email || item.description || "";
+
+                  return (
+                    <ListItem key={item.id} disablePadding divider>
+                      <ListItemButton 
+                        selected={isSelected} 
+                        onClick={() => setSelectedTarget(item)}
+                      >
+                        <ListItemText 
+                          primary={label} 
+                          secondary={subLabel || undefined} 
+                          primaryTypographyProps={{ fontWeight: isSelected ? 700 : 400 }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+
+        {/* Right Panel: Role Assignment Matrix */}
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+              Assigned Roles
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {selectedTarget 
+                ? `Managing roles for ${targetType}: ${selectedTarget.name || selectedTarget.username || selectedTarget.id}`
+                : `Select a ${targetType} on the left to assign or revoke permissions.`}
+            </Typography>
+
+            {actionLoading && <LinearProgress sx={{ mb: 2 }} />}
+
+            {!selectedTarget ? (
+              <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary">No selection made.</Typography>
+              </Box>
+            ) : rolesLoading ? (
+              <LinearProgress />
+            ) : (
+              <List sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                {roles.map((role) => {
+                  const isAssigned = assignedRoleIds.includes(role.id);
+                  return (
+                    <ListItem key={role.id} divider>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={isAssigned}
+                            disabled={actionLoading}
+                            onChange={() => handleRoleToggle(role.id, isAssigned)}
+                          />
+                        }
+                        label={
+                          <Box sx={{ ml: 1 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                              {role.label || role.name}
+                            </Typography>
+                            {role.description && (
+                              <Typography variant="caption" color="text.secondary">
+                                {role.description}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        sx={{ width: "100%", m: 0 }}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+}
+
+// ==========================================
 // COMPONENT: Main App Layout & View Router
 // ==========================================
 export default function App({ mode, onToggleColorMode }) {
@@ -509,7 +753,7 @@ export default function App({ mode, onToggleColorMode }) {
         const pages = response.data?.pages || [];
         setAllowedPages(pages);
 
-        // Redirect to first allowed page if the current default view is prohibited
+        // Redirect to first allowed page if current view is prohibited
         if (pages.length > 0 && !pages.includes(currentView)) {
           setCurrentView(pages[0]);
         }
@@ -541,38 +785,32 @@ export default function App({ mode, onToggleColorMode }) {
   // ------------------------------------------
   // SUMMARY / STATS STATE & EFFECTS
   // ------------------------------------------
-  // 1. OS Stats
   const [osRawItems, setOsRawItems] = useState([]);
   const [osChartData, setOsChartData] = useState([]);
   const [osLoading, setOsLoading] = useState(false);
   const [osError, setOsError] = useState(null);
 
-  // 2. Vendor Stats
   const [vendorRawItems, setVendorRawItems] = useState([]);
   const [vendorChartData, setVendorChartData] = useState([]);
   const [vendorLoading, setVendorLoading] = useState(false);
   const [vendorError, setVendorError] = useState(null);
 
-  // 3. Product Stats
   const [productRawItems, setProductRawItems] = useState([]);
   const [productChartData, setProductChartData] = useState([]);
   const [productLoading, setProductLoading] = useState(false);
   const [productError, setProductError] = useState(null);
 
-  // 4. Asset Types Stats
   const [assetTypeRawItems, setAssetTypeRawItems] = useState([]);
   const [assetTypeChartData, setAssetTypeChartData] = useState([]);
   const [assetTypeLoading, setAssetTypeLoading] = useState(false);
   const [assetTypeError, setAssetTypeError] = useState(null);
 
-  // 5. VM Location Stats
   const [vmGroup, setVmGroup] = useState("vcenter");
   const [vmLocationRawItems, setVmLocationRawItems] = useState([]);
   const [vmLocationChartData, setVmLocationChartData] = useState([]);
   const [vmLocationLoading, setVmLocationLoading] = useState(false);
   const [vmLocationError, setVmLocationError] = useState(null);
 
-  // 6. Bare Metal (BM) Location Stats
   const [bmGroup, setBmGroup] = useState("pod");
   const [bmLocationRawItems, setBmLocationRawItems] = useState([]);
   const [bmLocationChartData, setBmLocationChartData] = useState([]);
@@ -1195,6 +1433,7 @@ export default function App({ mode, onToggleColorMode }) {
             {currentView === "assets" && "Asset Master"}
             {currentView === "softwares" && "Softwares Inventory"}
             {currentView === "archived" && "Archived Assets"}
+            {currentView === "admin" && "User Administration"}
           </Typography>
 
           <Typography variant="body2" color="text.secondary">
@@ -1581,6 +1820,10 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Paper>
               </>
+            )}
+
+            {currentView === "admin" && allowedPages.includes("admin") && (
+              <AdminPage />
             )}
           </>
         )}
