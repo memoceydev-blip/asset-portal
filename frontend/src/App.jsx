@@ -55,6 +55,16 @@ import * as XLSX from "xlsx";
 import { api } from "./api";
 
 // ==========================================
+// NAVIGATION CONFIGURATION
+// ==========================================
+const NAV_ITEMS = [
+  { key: "summary", label: "Summary", icon: <DashboardIcon /> },
+  { key: "assets", label: "Assets", icon: <ComputerIcon /> },
+  { key: "softwares", label: "Softwares", icon: <SettingsApplicationsIcon /> },
+  { key: "archived", label: "Archived", icon: <InventoryIcon /> },
+];
+
+// ==========================================
 // HELPER: Power State Visual Configuration
 // ==========================================
 const getPowerStateConfig = (state) => {
@@ -479,6 +489,50 @@ export default function App({ mode, onToggleColorMode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
 
+  // ------------------------------------------
+  // PERMISSIONS / SECURITY STATE & EFFECTS
+  // ------------------------------------------
+  const [allowedPages, setAllowedPages] = useState([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [permissionsError, setPermissionsError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchPermissions = async () => {
+      setPermissionsLoading(true);
+      setPermissionsError(null);
+      try {
+        const response = await api.get("/api/v1/security/permissons", {
+          signal: controller.signal,
+        });
+        const pages = response.data?.pages || [];
+        setAllowedPages(pages);
+
+        // Redirect to first allowed page if the current default view is prohibited
+        if (pages.length > 0 && !pages.includes(currentView)) {
+          setCurrentView(pages[0]);
+        }
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching permissions:", err);
+        setPermissionsError("Failed to load user permissions.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setPermissionsLoading(false);
+        }
+      }
+    };
+
+    fetchPermissions();
+    return () => controller.abort();
+  }, []);
+
+  // Filter navigation items based on backend permissions
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => allowedPages.includes(item.key));
+  }, [allowedPages]);
+
   const handleViewChange = (targetView) => {
     setSelectedAssetId(null);
     setCurrentView(targetView);
@@ -526,7 +580,7 @@ export default function App({ mode, onToggleColorMode }) {
   const [bmLocationError, setBmLocationError] = useState(null);
 
   useEffect(() => {
-    if (currentView !== "summary") return;
+    if (currentView !== "summary" || !allowedPages.includes("summary")) return;
 
     const controller = new AbortController();
 
@@ -569,7 +623,7 @@ export default function App({ mode, onToggleColorMode }) {
     });
 
     return () => controller.abort();
-  }, [currentView, vmGroup, bmGroup]);
+  }, [currentView, vmGroup, bmGroup, allowedPages]);
 
   // ------------------------------------------
   // ASSETS VIEW STATE & EFFECTS
@@ -672,7 +726,7 @@ export default function App({ mode, onToggleColorMode }) {
   );
 
   useEffect(() => {
-    if (currentView !== "assets") return;
+    if (currentView !== "assets" || !allowedPages.includes("assets")) return;
 
     const controller = new AbortController();
     const loadAssets = async () => {
@@ -714,7 +768,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadAssets();
     return () => controller.abort();
-  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView]);
+  }, [assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters, currentView, allowedPages]);
 
   const handleExportAssetsExcel = async () => {
     setAssetExporting(true);
@@ -838,7 +892,7 @@ export default function App({ mode, onToggleColorMode }) {
   );
 
   useEffect(() => {
-    if (currentView !== "archived") return;
+    if (currentView !== "archived" || !allowedPages.includes("archived")) return;
 
     const controller = new AbortController();
     const loadArchived = async () => {
@@ -880,7 +934,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadArchived();
     return () => controller.abort();
-  }, [archivedPaginationModel, archivedSortModel, debouncedArchivedSearch, debouncedArchivedColumnFilters, currentView]);
+  }, [archivedPaginationModel, archivedSortModel, debouncedArchivedSearch, debouncedArchivedColumnFilters, currentView, allowedPages]);
 
   const handleExportArchivedExcel = async () => {
     setArchivedExporting(true);
@@ -966,7 +1020,7 @@ export default function App({ mode, onToggleColorMode }) {
   );
 
   useEffect(() => {
-    if (currentView !== "softwares") return;
+    if (currentView !== "softwares" || !allowedPages.includes("softwares")) return;
 
     const controller = new AbortController();
     const loadSoftwares = async () => {
@@ -1003,7 +1057,7 @@ export default function App({ mode, onToggleColorMode }) {
 
     loadSoftwares();
     return () => controller.abort();
-  }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView]);
+  }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, currentView, allowedPages]);
 
   const handleExportSoftwaresExcel = async () => {
     setSoftwareExporting(true);
@@ -1161,360 +1215,373 @@ export default function App({ mode, onToggleColorMode }) {
             Navigation
           </Typography>
           <Divider />
-          <List>
-            <ListItem disablePadding>
-              <ListItemButton selected={currentView === "summary"} onClick={() => handleViewChange("summary")}>
-                <ListItemIcon><DashboardIcon /></ListItemIcon>
-                <ListItemText primary="Summary" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton selected={currentView === "assets"} onClick={() => handleViewChange("assets")}>
-                <ListItemIcon><ComputerIcon /></ListItemIcon>
-                <ListItemText primary="Assets" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton selected={currentView === "softwares"} onClick={() => handleViewChange("softwares")}>
-                <ListItemIcon><SettingsApplicationsIcon /></ListItemIcon>
-                <ListItemText primary="Softwares" />
-              </ListItemButton>
-            </ListItem>
-            <ListItem disablePadding>
-              <ListItemButton selected={currentView === "archived"} onClick={() => handleViewChange("archived")}>
-                <ListItemIcon><InventoryIcon /></ListItemIcon>
-                <ListItemText primary="Archived" />
-              </ListItemButton>
-            </ListItem>
-          </List>
+
+          {permissionsLoading && <LinearProgress />}
+
+          {permissionsError && (
+            <Typography color="error" variant="caption" align="center" sx={{ display: "block", p: 2 }}>
+              {permissionsError}
+            </Typography>
+          )}
+
+          {!permissionsLoading && !permissionsError && (
+            <List>
+              {visibleNavItems.length > 0 ? (
+                visibleNavItems.map((item) => (
+                  <ListItem key={item.key} disablePadding>
+                    <ListItemButton selected={currentView === item.key} onClick={() => handleViewChange(item.key)}>
+                      <ListItemIcon>{item.icon}</ListItemIcon>
+                      <ListItemText primary={item.label} />
+                    </ListItemButton>
+                  </ListItem>
+                ))
+              ) : (
+                <Typography color="text.secondary" variant="body2" align="center" sx={{ p: 2 }}>
+                  No pages permitted.
+                </Typography>
+              )}
+            </List>
+          )}
         </Box>
       </Drawer>
 
       {/* Main Container */}
       <Container maxWidth={false} sx={{ py: 3 }}>
-        {currentView === "summary" && (
-          <Grid container spacing={3}>
-            {/* ROW 1 - Card 1: Operating Systems */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "Operating Systems Distribution",
-                "Breakdown of operating system distribution metrics across infrastructure.",
-                "Operating System",
-                osLoading,
-                osError,
-                osChartData,
-                osRawItems
-              )}
-            </Grid>
-
-            {/* ROW 1 - Card 2: Server Manufacturer / Vendor */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "Vendor / Manufacturer Breakdown",
-                "Hardware manufacturer distribution across server nodes.",
-                "Vendor / Manufacturer",
-                vendorLoading,
-                vendorError,
-                vendorChartData,
-                vendorRawItems
-              )}
-            </Grid>
-
-            {/* ROW 2 - Card 3: Server Product Model */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "Product Model Breakdown",
-                "Distribution across deployed hardware product lines.",
-                "Product Model",
-                productLoading,
-                productError,
-                productChartData,
-                productRawItems
-              )}
-            </Grid>
-
-            {/* ROW 2 - Card 4: Asset Types */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "Asset Types Breakdown",
-                "Distribution across registered asset classification types.",
-                "Asset Type",
-                assetTypeLoading,
-                assetTypeError,
-                assetTypeChartData,
-                assetTypeRawItems
-              )}
-            </Grid>
-
-            {/* ROW 3 - Card 5: VM Locations */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "VM Location Distribution",
-                `Virtual machine counts grouped by ${vmGroup === "vcenter" ? "vCenter Server" : "Cluster"}.`,
-                vmGroup === "vcenter" ? "vCenter" : "Cluster",
-                vmLocationLoading,
-                vmLocationError,
-                vmLocationChartData,
-                vmLocationRawItems,
-                <ToggleButtonGroup
-                  size="small"
-                  value={vmGroup}
-                  exclusive
-                  onChange={(_, val) => val && setVmGroup(val)}
-                  aria-label="Group VM Location By"
-                >
-                  <ToggleButton value="vcenter">vCenter</ToggleButton>
-                  <ToggleButton value="cluster">Cluster</ToggleButton>
-                </ToggleButtonGroup>
-              )}
-            </Grid>
-
-            {/* ROW 3 - Card 6: Bare Metal (BM) Locations */}
-            <Grid item xs={12} md={6}>
-              {renderStatCard(
-                "Bare Metal Location Distribution",
-                `Bare metal counts grouped by ${bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site"}.`,
-                bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site",
-                bmLocationLoading,
-                bmLocationError,
-                bmLocationChartData,
-                bmLocationRawItems,
-                <ToggleButtonGroup
-                  size="small"
-                  value={bmGroup}
-                  exclusive
-                  onChange={(_, val) => val && setBmGroup(val)}
-                  aria-label="Group Bare Metal Location By"
-                >
-                  <ToggleButton value="pod">Pod</ToggleButton>
-                  <ToggleButton value="cabinet">Cabinet</ToggleButton>
-                  <ToggleButton value="site">Site</ToggleButton>
-                </ToggleButtonGroup>
-              )}
-            </Grid>
-          </Grid>
-        )}
-        
-        {currentView === "assets" && (
+        {permissionsLoading ? (
+          <Box sx={{ width: "100%", py: 6 }}>
+            <LinearProgress />
+          </Box>
+        ) : permissionsError ? (
+          <Typography color="error" align="center" sx={{ py: 4 }}>
+            {permissionsError}
+          </Typography>
+        ) : (
           <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Search Assets"
-                value={assetSearch}
-                onChange={(e) => {
-                  setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-                  setAssetSearch(e.target.value);
-                }}
-              />
-              <Button
-                variant="outlined"
-                startIcon={<FileDownloadOutlinedIcon />}
-                onClick={handleExportAssetsExcel}
-                disabled={assetExporting || assetRowCount === 0}
-                sx={actionButtonSx}
-              >
-                {assetExporting ? "Exporting..." : "Export Excel"}
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<FilterAltOffOutlinedIcon />}
-                onClick={handleClearAssetFilters}
-                disabled={!hasActiveAssetFilters}
-                sx={{
-                  ...actionButtonSx,
-                  "&:hover": {
-                    bgcolor: "error.main",
-                    color: "error.contrastText",
-                    borderColor: "error.main",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    transform: "translateY(-1px)",
-                  },
-                }}
-              >
-                Clear Filters
-              </Button>
-            </Paper>
+            {currentView === "summary" && allowedPages.includes("summary") && (
+              <Grid container spacing={3}>
+                {/* ROW 1 - Card 1: Operating Systems */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "Operating Systems Distribution",
+                    "Breakdown of operating system distribution metrics across infrastructure.",
+                    "Operating System",
+                    osLoading,
+                    osError,
+                    osChartData,
+                    osRawItems
+                  )}
+                </Grid>
 
-            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-              <DataGrid
-                columnHeaderHeight={70}
-                rows={assetRows}
-                columns={assetColumns}
-                loading={assetLoading}
-                rowCount={assetRowCount}
-                pagination
-                paginationMode="server"
-                sortingMode="server"
-                paginationModel={assetPaginationModel}
-                onPaginationModelChange={setAssetPaginationModel}
-                sortModel={assetSortModel}
-                onSortModelChange={setAssetSortModel}
-                pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
-                onRowClick={(params) => setSelectedAssetId(params.row.id)}
-                sx={{
-                  bgcolor: "background.paper",
-                  cursor: "pointer",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                }}
-              />
-            </Paper>
-          </>
-        )}
+                {/* ROW 1 - Card 2: Server Manufacturer / Vendor */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "Vendor / Manufacturer Breakdown",
+                    "Hardware manufacturer distribution across server nodes.",
+                    "Vendor / Manufacturer",
+                    vendorLoading,
+                    vendorError,
+                    vendorChartData,
+                    vendorRawItems
+                  )}
+                </Grid>
 
-        {currentView === "archived" && (
-          <>
-            <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Search Archived Assets"
-                value={archivedSearch}
-                onChange={(e) => {
-                  setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
-                  setArchivedSearch(e.target.value);
-                }}
-              />
-              <Button
-                variant="outlined"
-                startIcon={<FileDownloadOutlinedIcon />}
-                onClick={handleExportArchivedExcel}
-                disabled={archivedExporting || archivedRowCount === 0}
-                sx={actionButtonSx}
-              >
-                {archivedExporting ? "Exporting..." : "Export Excel"}
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<FilterAltOffOutlinedIcon />}
-                onClick={handleClearArchivedFilters}
-                disabled={!hasActiveArchivedFilters}
-                sx={{
-                  ...actionButtonSx,
-                  "&:hover": {
-                    bgcolor: "error.main",
-                    color: "error.contrastText",
-                    borderColor: "error.main",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                    transform: "translateY(-1px)",
-                  },
-                }}
-              >
-                Clear Filters
-              </Button>
-            </Paper>
+                {/* ROW 2 - Card 3: Server Product Model */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "Product Model Breakdown",
+                    "Distribution across deployed hardware product lines.",
+                    "Product Model",
+                    productLoading,
+                    productError,
+                    productChartData,
+                    productRawItems
+                  )}
+                </Grid>
 
-            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-              <DataGrid
-                columnHeaderHeight={70}
-                rows={archivedRows}
-                columns={archivedColumns}
-                loading={archivedLoading}
-                rowCount={archivedRowCount}
-                pagination
-                paginationMode="server"
-                sortingMode="server"
-                paginationModel={archivedPaginationModel}
-                onPaginationModelChange={setArchivedPaginationModel}
-                sortModel={archivedSortModel}
-                onSortModelChange={setArchivedSortModel}
-                pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
-                onRowClick={(params) => setSelectedAssetId(params.row.id)}
-                sx={{
-                  bgcolor: "background.paper",
-                  cursor: "pointer",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                }}
-              />
-            </Paper>
-          </>
-        )}
+                {/* ROW 2 - Card 4: Asset Types */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "Asset Types Breakdown",
+                    "Distribution across registered asset classification types.",
+                    "Asset Type",
+                    assetTypeLoading,
+                    assetTypeError,
+                    assetTypeChartData,
+                    assetTypeRawItems
+                  )}
+                </Grid>
 
-        {currentView === "softwares" && (
-          <>
-            <Paper sx={{ p: 2, mb: 2 }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
-                <TextField
-                  size="small"
-                  label="Search Name"
-                  value={swSearchName}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchName(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search Version"
-                  value={swSearchVersion}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchVersion(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search OS"
-                  value={swSearchOS}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchOS(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <TextField
-                  size="small"
-                  label="Search Owner"
-                  value={swSearchOwner}
-                  onChange={(e) => {
-                    setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
-                    setSwSearchOwner(e.target.value);
-                  }}
-                  sx={{ flex: 1 }}
-                />
-                <Button
-                  variant="outlined"
-                  startIcon={<FileDownloadOutlinedIcon />}
-                  onClick={handleExportSoftwaresExcel}
-                  disabled={softwareExporting || softwareRowCount === 0}
-                  sx={actionButtonSx}
-                >
-                  {softwareExporting ? "Exporting..." : "Export Excel"}
-                </Button>
-              </Stack>
-            </Paper>
+                {/* ROW 3 - Card 5: VM Locations */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "VM Location Distribution",
+                    `Virtual machine counts grouped by ${vmGroup === "vcenter" ? "vCenter Server" : "Cluster"}.`,
+                    vmGroup === "vcenter" ? "vCenter" : "Cluster",
+                    vmLocationLoading,
+                    vmLocationError,
+                    vmLocationChartData,
+                    vmLocationRawItems,
+                    <ToggleButtonGroup
+                      size="small"
+                      value={vmGroup}
+                      exclusive
+                      onChange={(_, val) => val && setVmGroup(val)}
+                      aria-label="Group VM Location By"
+                    >
+                      <ToggleButton value="vcenter">vCenter</ToggleButton>
+                      <ToggleButton value="cluster">Cluster</ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
+                </Grid>
 
-            <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-              <DataGrid
-                rows={softwareRows}
-                columns={softwareColumns}
-                loading={softwareLoading}
-                rowCount={softwareRowCount}
-                pagination
-                paginationMode="server"
-                sortingMode="server"
-                paginationModel={softwarePaginationModel}
-                onPaginationModelChange={setSoftwarePaginationModel}
-                sortModel={softwareSortModel}
-                onSortModelChange={setSoftwareSortModel}
-                pageSizeOptions={[25, 50, 100]}
-                disableRowSelectionOnClick
-                getRowId={(row) => row.id || `${row.asset}-${row.name}`}
-                onRowClick={(params) => setSelectedAssetId(params.row.asset)}
-                sx={{
-                  bgcolor: "background.paper",
-                  cursor: "pointer",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                }}
-              />
-            </Paper>
+                {/* ROW 3 - Card 6: Bare Metal (BM) Locations */}
+                <Grid item xs={12} md={6}>
+                  {renderStatCard(
+                    "Bare Metal Location Distribution",
+                    `Bare metal counts grouped by ${bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site"}.`,
+                    bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site",
+                    bmLocationLoading,
+                    bmLocationError,
+                    bmLocationChartData,
+                    bmLocationRawItems,
+                    <ToggleButtonGroup
+                      size="small"
+                      value={bmGroup}
+                      exclusive
+                      onChange={(_, val) => val && setBmGroup(val)}
+                      aria-label="Group Bare Metal Location By"
+                    >
+                      <ToggleButton value="pod">Pod</ToggleButton>
+                      <ToggleButton value="cabinet">Cabinet</ToggleButton>
+                      <ToggleButton value="site">Site</ToggleButton>
+                    </ToggleButtonGroup>
+                  )}
+                </Grid>
+              </Grid>
+            )}
+            
+            {currentView === "assets" && allowedPages.includes("assets") && (
+              <>
+                <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search Assets"
+                    value={assetSearch}
+                    onChange={(e) => {
+                      setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+                      setAssetSearch(e.target.value);
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownloadOutlinedIcon />}
+                    onClick={handleExportAssetsExcel}
+                    disabled={assetExporting || assetRowCount === 0}
+                    sx={actionButtonSx}
+                  >
+                    {assetExporting ? "Exporting..." : "Export Excel"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FilterAltOffOutlinedIcon />}
+                    onClick={handleClearAssetFilters}
+                    disabled={!hasActiveAssetFilters}
+                    sx={{
+                      ...actionButtonSx,
+                      "&:hover": {
+                        bgcolor: "error.main",
+                        color: "error.contrastText",
+                        borderColor: "error.main",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transform: "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </Paper>
+
+                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+                  <DataGrid
+                    columnHeaderHeight={70}
+                    rows={assetRows}
+                    columns={assetColumns}
+                    loading={assetLoading}
+                    rowCount={assetRowCount}
+                    pagination
+                    paginationMode="server"
+                    sortingMode="server"
+                    paginationModel={assetPaginationModel}
+                    onPaginationModelChange={setAssetPaginationModel}
+                    sortModel={assetSortModel}
+                    onSortModelChange={setAssetSortModel}
+                    pageSizeOptions={[25, 50, 100]}
+                    disableRowSelectionOnClick
+                    onRowClick={(params) => setSelectedAssetId(params.row.id)}
+                    sx={{
+                      bgcolor: "background.paper",
+                      cursor: "pointer",
+                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                    }}
+                  />
+                </Paper>
+              </>
+            )}
+
+            {currentView === "archived" && allowedPages.includes("archived") && (
+              <>
+                <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search Archived Assets"
+                    value={archivedSearch}
+                    onChange={(e) => {
+                      setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
+                      setArchivedSearch(e.target.value);
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownloadOutlinedIcon />}
+                    onClick={handleExportArchivedExcel}
+                    disabled={archivedExporting || archivedRowCount === 0}
+                    sx={actionButtonSx}
+                  >
+                    {archivedExporting ? "Exporting..." : "Export Excel"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FilterAltOffOutlinedIcon />}
+                    onClick={handleClearArchivedFilters}
+                    disabled={!hasActiveArchivedFilters}
+                    sx={{
+                      ...actionButtonSx,
+                      "&:hover": {
+                        bgcolor: "error.main",
+                        color: "error.contrastText",
+                        borderColor: "error.main",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transform: "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </Paper>
+
+                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+                  <DataGrid
+                    columnHeaderHeight={70}
+                    rows={archivedRows}
+                    columns={archivedColumns}
+                    loading={archivedLoading}
+                    rowCount={archivedRowCount}
+                    pagination
+                    paginationMode="server"
+                    sortingMode="server"
+                    paginationModel={archivedPaginationModel}
+                    onPaginationModelChange={setArchivedPaginationModel}
+                    sortModel={archivedSortModel}
+                    onSortModelChange={setArchivedSortModel}
+                    pageSizeOptions={[25, 50, 100]}
+                    disableRowSelectionOnClick
+                    onRowClick={(params) => setSelectedAssetId(params.row.id)}
+                    sx={{
+                      bgcolor: "background.paper",
+                      cursor: "pointer",
+                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                    }}
+                  />
+                </Paper>
+              </>
+            )}
+
+            {currentView === "softwares" && allowedPages.includes("softwares") && (
+              <>
+                <Paper sx={{ p: 2, mb: 2 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems="center">
+                    <TextField
+                      size="small"
+                      label="Search Name"
+                      value={swSearchName}
+                      onChange={(e) => {
+                        setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                        setSwSearchName(e.target.value);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Search Version"
+                      value={swSearchVersion}
+                      onChange={(e) => {
+                        setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                        setSwSearchVersion(e.target.value);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Search OS"
+                      value={swSearchOS}
+                      onChange={(e) => {
+                        setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                        setSwSearchOS(e.target.value);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <TextField
+                      size="small"
+                      label="Search Owner"
+                      value={swSearchOwner}
+                      onChange={(e) => {
+                        setSoftwarePaginationModel((prev) => ({ ...prev, page: 0 }));
+                        setSwSearchOwner(e.target.value);
+                      }}
+                      sx={{ flex: 1 }}
+                    />
+                    <Button
+                      variant="outlined"
+                      startIcon={<FileDownloadOutlinedIcon />}
+                      onClick={handleExportSoftwaresExcel}
+                      disabled={softwareExporting || softwareRowCount === 0}
+                      sx={actionButtonSx}
+                    >
+                      {softwareExporting ? "Exporting..." : "Export Excel"}
+                    </Button>
+                  </Stack>
+                </Paper>
+
+                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+                  <DataGrid
+                    rows={softwareRows}
+                    columns={softwareColumns}
+                    loading={softwareLoading}
+                    rowCount={softwareRowCount}
+                    pagination
+                    paginationMode="server"
+                    sortingMode="server"
+                    paginationModel={softwarePaginationModel}
+                    onPaginationModelChange={setSoftwarePaginationModel}
+                    sortModel={softwareSortModel}
+                    onSortModelChange={setSoftwareSortModel}
+                    pageSizeOptions={[25, 50, 100]}
+                    disableRowSelectionOnClick
+                    getRowId={(row) => row.id || `${row.asset}-${row.name}`}
+                    onRowClick={(params) => setSelectedAssetId(params.row.asset)}
+                    sx={{
+                      bgcolor: "background.paper",
+                      cursor: "pointer",
+                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                    }}
+                  />
+                </Paper>
+              </>
+            )}
           </>
         )}
       </Container>
