@@ -503,7 +503,7 @@ export default function App({ mode, onToggleColorMode }) {
       setPermissionsLoading(true);
       setPermissionsError(null);
       try {
-        const response = await api.get("/api/v1/security/permissons", {
+        const response = await api.get("/api/v1/security/permissions", {
           signal: controller.signal,
         });
         const pages = response.data?.pages || [];
@@ -648,7 +648,7 @@ export default function App({ mode, onToggleColorMode }) {
     const delayHandler = setTimeout(() => {
       setDebouncedAssetColumnFilters(assetColumnFilters);
     }, 400);
-    return () => clearTimeout(delayHandler);
+    return () => clearTimeout(assetColumnFilters);
   }, [assetColumnFilters]);
 
   const handleColumnFilterChange = (field, value) => {
