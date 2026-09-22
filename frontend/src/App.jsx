@@ -417,7 +417,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
               {tabValue === 3 && (
                 <Box>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                    Monitored Agents
+                    Info Agents Status
                   </Typography>
                   {details.agents?.length ? (
                     <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
@@ -437,6 +437,35 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                               <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
                                 {agent.agent_last || "-"}
                               </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Typography color="text.secondary" variant="body2">
+                      No agent status information available.
+                    </Typography>
+                  )}
+                </Box>
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                    Monitoring Status
+                  </Typography>
+                  {details.agents?.length ? (
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
+                      <Table size="small" stickyHeader aria-label="Agent status list">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Status</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {details.monitors.map((monitor, index) => (
+                            <TableRow key={`${monitor.monitor_name || "monitor"}-${index}`} hover>
+                              <TableCell sx={{ fontWeight: 500 }}>{monitor.monitor_name || "-"}</TableCell>
+                              <TableCell>{monitor.monitor_status || "-"}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
