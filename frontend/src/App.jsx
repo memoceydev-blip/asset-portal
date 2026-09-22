@@ -452,9 +452,9 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
                     Monitoring Status
                   </Typography>
-                  {details.agents?.length ? (
+                  {details.monitors?.length ? (
                     <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
-                      <Table size="small" stickyHeader aria-label="Agent status list">
+                      <Table size="small" stickyHeader aria-label="Monitoring status list">
                         <TableHead>
                           <TableRow>
                             <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
@@ -473,7 +473,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                     </TableContainer>
                   ) : (
                     <Typography color="text.secondary" variant="body2">
-                      No agent status information available.
+                      No monitor status information available.
                     </Typography>
                   )}
                 </Box>
