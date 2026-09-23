@@ -102,6 +102,208 @@ DetailRow.propTypes = {
 };
 
 // ==========================================
+// COMPONENT: Self-Contained Summary Stat Card
+// ==========================================
+function StatCard({
+  title,
+  subtitle,
+  url,
+  defaultLabel,
+  groupOptions,
+  initialGroup,
+  extraParams = {},
+}) {
+  const [selectedGroup, setSelectedGroup] = useState(initialGroup || "");
+  const [rawItems, setRawItems] = useState([]);
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadMetrics = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const params = { ...extraParams };
+        if (selectedGroup) {
+          params.group_by = selectedGroup;
+        }
+
+        const response = await api.get(url, {
+          signal: controller.signal,
+          params,
+        });
+
+        const items = response.data?.items || [];
+        setRawItems(items);
+
+        const formattedChart = items.map((item, index) => ({
+          id: index,
+          value: item.count,
+          label: item.name || defaultLabel,
+        }));
+        setChartData(formattedChart);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error(`Error loading stat metrics from ${url}:`, err);
+        setError("Failed to load metrics summary.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadMetrics();
+    return () => controller.abort();
+  }, [url, selectedGroup, JSON.stringify(extraParams)]);
+
+  const tableHeaderLabel = useMemo(() => {
+    if (!groupOptions) return defaultLabel;
+    const currentOption = groupOptions.find((opt) => opt.value === selectedGroup);
+    return currentOption ? currentOption.label : defaultLabel;
+  }, [groupOptions, selectedGroup, defaultLabel]);
+
+  return (
+    <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
+      <CardContent>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          sx={{ mb: 0.5 }}
+        >
+          <Box>
+            <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+              {title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              {subtitle}
+            </Typography>
+          </Box>
+
+          {groupOptions && groupOptions.length > 0 && (
+            <ToggleButtonGroup
+              size="small"
+              value={selectedGroup}
+              exclusive
+              onChange={(_, val) => val && setSelectedGroup(val)}
+              aria-label={`Group ${title} By`}
+            >
+              {groupOptions.map((opt) => (
+                <ToggleButton key={opt.value} value={opt.value}>
+                  {opt.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          )}
+        </Stack>
+
+        {loading && (
+          <Box sx={{ width: "100%", py: 6 }}>
+            <LinearProgress />
+          </Box>
+        )}
+
+        {error && !loading && (
+          <Typography color="error" align="center" sx={{ py: 4 }}>
+            {error}
+          </Typography>
+        )}
+
+        {!loading && !error && chartData.length === 0 && (
+          <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
+            No telemetry records found.
+          </Typography>
+        )}
+
+        {!loading && !error && chartData.length > 0 && (
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
+              <Box sx={{ width: "100%", maxWidth: 280, height: 240 }}>
+                <PieChart
+                  series={[
+                    {
+                      data: chartData,
+                      innerRadius: 40,
+                      outerRadius: 90,
+                      paddingAngle: 3,
+                      cornerRadius: 5,
+                      highlightScope: { faded: "blurred", highlighted: "onSeries" },
+                    },
+                  ]}
+                  height={230}
+                  slotProps={{
+                    legend: { hidden: true },
+                  }}
+                />
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={7}>
+              <TableContainer
+                component={Paper}
+                variant="outlined"
+                sx={{ maxHeight: 280, overflow: "auto" }}
+              >
+                <Table stickyHeader size="small" aria-label={`${title} counts table`}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>
+                        {tableHeaderLabel}
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}
+                      >
+                        Count
+                      </TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {rawItems.map((row, index) => (
+                      <TableRow key={`${row.name || "item"}-${index}`} hover>
+                        <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
+                          {row.name || "Unknown"}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
+                        >
+                          {row.count?.toLocaleString() || 0}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Grid>
+          </Grid>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+StatCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  subtitle: PropTypes.string.isRequired,
+  url: PropTypes.string.isRequired,
+  defaultLabel: PropTypes.string.isRequired,
+  groupOptions: PropTypes.arrayOf(
+    PropTypes.shape({
+      value: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+    })
+  ),
+  initialGroup: PropTypes.string,
+  extraParams: PropTypes.object,
+};
+
+// ==========================================
 // COMPONENT: Asset Details Modal
 // ==========================================
 function AssetDetailsModal({ assetId, open, onClose }) {
@@ -864,87 +1066,6 @@ export default function App({ mode, onToggleColorMode }) {
   };
 
   // ------------------------------------------
-  // SUMMARY / STATS STATE & EFFECTS
-  // ------------------------------------------
-  const [osRawItems, setOsRawItems] = useState([]);
-  const [osChartData, setOsChartData] = useState([]);
-  const [osLoading, setOsLoading] = useState(false);
-  const [osError, setOsError] = useState(null);
-
-  const [vendorRawItems, setVendorRawItems] = useState([]);
-  const [vendorChartData, setVendorChartData] = useState([]);
-  const [vendorLoading, setVendorLoading] = useState(false);
-  const [vendorError, setVendorError] = useState(null);
-
-  const [productRawItems, setProductRawItems] = useState([]);
-  const [productChartData, setProductChartData] = useState([]);
-  const [productLoading, setProductLoading] = useState(false);
-  const [productError, setProductError] = useState(null);
-
-  const [assetTypeRawItems, setAssetTypeRawItems] = useState([]);
-  const [assetTypeChartData, setAssetTypeChartData] = useState([]);
-  const [assetTypeLoading, setAssetTypeLoading] = useState(false);
-  const [assetTypeError, setAssetTypeError] = useState(null);
-
-  const [vmGroup, setVmGroup] = useState("vcenter");
-  const [vmLocationRawItems, setVmLocationRawItems] = useState([]);
-  const [vmLocationChartData, setVmLocationChartData] = useState([]);
-  const [vmLocationLoading, setVmLocationLoading] = useState(false);
-  const [vmLocationError, setVmLocationError] = useState(null);
-
-  const [bmGroup, setBmGroup] = useState("pod");
-  const [bmLocationRawItems, setBmLocationRawItems] = useState([]);
-  const [bmLocationChartData, setBmLocationChartData] = useState([]);
-  const [bmLocationLoading, setBmLocationLoading] = useState(false);
-  const [bmLocationError, setBmLocationError] = useState(null);
-
-  useEffect(() => {
-    if (currentView !== "summary" || !allowedPages.includes("summary")) return;
-
-    const controller = new AbortController();
-
-    const fetchStat = async (url, setRaw, setChart, setLoading, setError, defaultLabel, extraParams = {}) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.get(url, { signal: controller.signal, params: extraParams });
-        const items = response.data?.items || [];
-        setRaw(items);
-        
-        const formattedChart = items.map((item, index) => ({
-          id: index,
-          value: item.count,
-          label: item.name || defaultLabel,
-        }));
-        setChart(formattedChart);
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error(`Error loading stat metrics from ${url}:`, err);
-        setError("Failed to load metrics summary.");
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchStat("/api/v1/stats/os", setOsRawItems, setOsChartData, setOsLoading, setOsError, "Unknown OS");
-    fetchStat("/api/v1/stats/vendor", setVendorRawItems, setVendorChartData, setVendorLoading, setVendorError, "Unknown Vendor");
-    fetchStat("/api/v1/stats/product", setProductRawItems, setProductChartData, setProductLoading, setProductError, "Unknown Product");
-    fetchStat("/api/v1/stats/asset_types", setAssetTypeRawItems, setAssetTypeChartData, setAssetTypeLoading, setAssetTypeError, "Unknown Asset Type");
-    fetchStat("/api/v1/stats/locations", setVmLocationRawItems, setVmLocationChartData, setVmLocationLoading, setVmLocationError, "Unknown Location", {
-      asset_type: "vm",
-      group_by: vmGroup,
-    });
-    fetchStat("/api/v1/stats/locations", setBmLocationRawItems, setBmLocationChartData, setBmLocationLoading, setBmLocationError, "Unknown Location", {
-      asset_type: "bm",
-      group_by: bmGroup,
-    });
-
-    return () => controller.abort();
-  }, [currentView, vmGroup, bmGroup, allowedPages]);
-
-  // ------------------------------------------
   // ASSETS VIEW STATE & EFFECTS
   // ------------------------------------------
   const [assetRows, setAssetRows] = useState([]);
@@ -1411,95 +1532,6 @@ export default function App({ mode, onToggleColorMode }) {
     }
   };
 
-  // Helper render for Summary Card Items
-  const renderStatCard = (title, subtitle, tableHeader, loading, error, chartData, rawItems, headerAction = null) => (
-    <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
-      <CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
-          <Box>
-            <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
-              {title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              {subtitle}
-            </Typography>
-          </Box>
-          {headerAction}
-        </Stack>
-
-        {loading && (
-          <Box sx={{ width: "100%", py: 6 }}>
-            <LinearProgress />
-          </Box>
-        )}
-
-        {error && !loading && (
-          <Typography color="error" align="center" sx={{ py: 4 }}>
-            {error}
-          </Typography>
-        )}
-
-        {!loading && !error && chartData.length === 0 && (
-          <Typography color="text.secondary" align="center" sx={{ py: 4 }}>
-            No telemetry records found.
-          </Typography>
-        )}
-
-        {!loading && !error && chartData.length > 0 && (
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={5} sx={{ display: "flex", justifyContent: "center" }}>
-              <Box sx={{ width: "100%", maxWidth: 280, height: 240 }}>
-                <PieChart
-                  series={[
-                    {
-                      data: chartData,
-                      innerRadius: 40,
-                      outerRadius: 90,
-                      paddingAngle: 3,
-                      cornerRadius: 5,
-                      highlightScope: { faded: "blurred", highlighted: "onSeries" },
-                    },
-                  ]}
-                  height={230}
-                  slotProps={{
-                    legend: { hidden: true },
-                  }}
-                />
-              </Box>
-            </Grid>
-
-            <Grid item xs={12} md={7}>
-              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 280, overflow: "auto" }}>
-                <Table stickyHeader size="small" aria-label={`${title} counts table`}>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>{tableHeader}</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}>
-                        Count
-                      </TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {rawItems.map((row, index) => (
-                      <TableRow key={`${row.name || "item"}-${index}`} hover>
-                        <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
-                          {row.name || "Unknown"}
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}>
-                          {row.count?.toLocaleString() || 0}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Grid>
-          </Grid>
-        )}
-      </CardContent>
-    </Card>
-  );
-
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default", color: "text.primary" }}>
       {/* Top App Bar */}
@@ -1581,101 +1613,75 @@ export default function App({ mode, onToggleColorMode }) {
               <Grid container spacing={3}>
                 {/* ROW 1 - Card 1: Operating Systems */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Operating Systems Distribution",
-                    "Breakdown of operating system distribution metrics across infrastructure.",
-                    "Operating System",
-                    osLoading,
-                    osError,
-                    osChartData,
-                    osRawItems
-                  )}
+                  <StatCard
+                    title="Operating Systems Distribution"
+                    subtitle="Breakdown of operating system distribution metrics across infrastructure."
+                    url="/api/v1/stats/os"
+                    defaultLabel="Unknown OS"
+                  />
                 </Grid>
 
                 {/* ROW 1 - Card 2: Server Manufacturer / Vendor */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Vendor / Manufacturer Breakdown",
-                    "Hardware manufacturer distribution across server nodes.",
-                    "Vendor / Manufacturer",
-                    vendorLoading,
-                    vendorError,
-                    vendorChartData,
-                    vendorRawItems
-                  )}
+                  <StatCard
+                    title="Vendor / Manufacturer Breakdown"
+                    subtitle="Hardware manufacturer distribution across server nodes."
+                    url="/api/v1/stats/vendor"
+                    defaultLabel="Unknown Vendor"
+                  />
                 </Grid>
 
                 {/* ROW 2 - Card 3: Server Product Model */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Product Model Breakdown",
-                    "Distribution across deployed hardware product lines.",
-                    "Product Model",
-                    productLoading,
-                    productError,
-                    productChartData,
-                    productRawItems
-                  )}
+                  <StatCard
+                    title="Product Model Breakdown"
+                    subtitle="Distribution across deployed hardware product lines."
+                    url="/api/v1/stats/product"
+                    defaultLabel="Unknown Product"
+                  />
                 </Grid>
 
                 {/* ROW 2 - Card 4: Asset Types */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Asset Types Breakdown",
-                    "Distribution across registered asset classification types.",
-                    "Asset Type",
-                    assetTypeLoading,
-                    assetTypeError,
-                    assetTypeChartData,
-                    assetTypeRawItems
-                  )}
+                  <StatCard
+                    title="Asset Types Breakdown"
+                    subtitle="Distribution across registered asset classification types."
+                    url="/api/v1/stats/asset_types"
+                    defaultLabel="Unknown Asset Type"
+                  />
                 </Grid>
 
                 {/* ROW 3 - Card 5: VM Locations */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Virtual Machine Location Distribution",
-                    `Virtual machine counts grouped by ${vmGroup === "vcenter" ? "vCenter Server" : "Cluster"}.`,
-                    vmGroup === "vcenter" ? "vCenter" : "Cluster",
-                    vmLocationLoading,
-                    vmLocationError,
-                    vmLocationChartData,
-                    vmLocationRawItems,
-                    <ToggleButtonGroup
-                      size="small"
-                      value={vmGroup}
-                      exclusive
-                      onChange={(_, val) => val && setVmGroup(val)}
-                      aria-label="Group VM Location By"
-                    >
-                      <ToggleButton value="vcenter">vCenter</ToggleButton>
-                      <ToggleButton value="cluster">Cluster</ToggleButton>
-                    </ToggleButtonGroup>
-                  )}
+                  <StatCard
+                    title="Virtual Machine Location Distribution"
+                    subtitle="Virtual machine counts grouped by selected boundary."
+                    url="/api/v1/stats/locations"
+                    defaultLabel="Unknown Location"
+                    initialGroup="vcenter"
+                    extraParams={{ asset_type: "vm" }}
+                    groupOptions={[
+                      { value: "vcenter", label: "vCenter" },
+                      { value: "cluster", label: "Cluster" },
+                    ]}
+                  />
                 </Grid>
 
                 {/* ROW 3 - Card 6: Bare Metal (BM) Locations */}
                 <Grid item xs={12} md={6}>
-                  {renderStatCard(
-                    "Bare Metal Location Distribution",
-                    `Bare metal counts grouped by ${bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site"}.`,
-                    bmGroup === "pod" ? "Pod" : bmGroup === "cabinet" ? "Cabinet" : "Site",
-                    bmLocationLoading,
-                    bmLocationError,
-                    bmLocationChartData,
-                    bmLocationRawItems,
-                    <ToggleButtonGroup
-                      size="small"
-                      value={bmGroup}
-                      exclusive
-                      onChange={(_, val) => val && setBmGroup(val)}
-                      aria-label="Group Bare Metal Location By"
-                    >
-                      <ToggleButton value="pod">Pod</ToggleButton>
-                      <ToggleButton value="cabinet">Cabinet</ToggleButton>
-                      <ToggleButton value="site">Site</ToggleButton>
-                    </ToggleButtonGroup>
-                  )}
+                  <StatCard
+                    title="Bare Metal Location Distribution"
+                    subtitle="Bare metal counts grouped by selected boundary."
+                    url="/api/v1/stats/locations"
+                    defaultLabel="Unknown Location"
+                    initialGroup="pod"
+                    extraParams={{ asset_type: "bm" }}
+                    groupOptions={[
+                      { value: "pod", label: "Pod" },
+                      { value: "cabinet", label: "Cabinet" },
+                      { value: "site", label: "Site" },
+                    ]}
+                  />
                 </Grid>
               </Grid>
             )}
