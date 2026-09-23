@@ -415,68 +415,93 @@ function AssetDetailsModal({ assetId, open, onClose }) {
 
               {/* TAB 3: AGENT STATUS PANEL */}
               {tabValue === 3 && (
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                    Info Agents Status
-                  </Typography>
-                  {details.agents?.length ? (
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
-                      <Table size="small" stickyHeader aria-label="Agent status list">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {details.agents.map((agent, index) => (
-                            <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
-                              <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
-                              <TableCell>{agent.agent_status || "-"}</TableCell>
-                              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                                {agent.agent_last || "-"}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Typography color="text.secondary" variant="body2">
-                      No agent status information available.
+                <Stack spacing={3}>
+                  {/* Section 1: Info Agents Status */}
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                      Info Agents Status
                     </Typography>
-                  )}
-                </Box>
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                    Monitoring Status
-                  </Typography>
-                  {details.monitors?.length ? (
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 320, overflow: "auto" }}>
-                      <Table size="small" stickyHeader aria-label="Monitoring status list">
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Status</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {details.monitors.map((monitor, index) => (
-                            <TableRow key={`${monitor.monitor_name || "monitor"}-${index}`} hover>
-                              <TableCell sx={{ fontWeight: 500 }}>{monitor.monitor_name || "-"}</TableCell>
-                              <TableCell>{monitor.monitor_status || "-"}</TableCell>
+                    {details.agents?.length ? (
+                      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
+                        <Table size="small" stickyHeader aria-label="Info agents status list">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Typography color="text.secondary" variant="body2">
-                      No monitor status information available.
+                          </TableHead>
+                          <TableBody>
+                            {details.agents.map((agent, index) => (
+                              <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
+                                <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
+                                <TableCell>{agent.agent_status || "-"}</TableCell>
+                                <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                  {agent.agent_last || "-"}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography color="text.secondary" variant="body2">
+                        No agent status information available.
+                      </Typography>
+                    )}
+                  </Box>
+
+                  <Divider variant="dashed" />
+
+                  {/* Section 2: Monitoring Status */}
+                  <Box>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                      Monitoring Status
                     </Typography>
-                  )}
-                </Box>
+                    {details.monitoring?.length ? (
+                      <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
+                        <Table size="small" stickyHeader aria-label="Monitoring status list">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Status</TableCell>
+                              <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor URL</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {details.monitoring.map((item, index) => (
+                              <TableRow key={`${item.monitor_name || "monitor"}-${index}`} hover>
+                                <TableCell sx={{ fontWeight: 500 }}>{item.monitor_name || "-"}</TableCell>
+                                <TableCell>{item.monitor_status || "-"}</TableCell>
+                                <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                  {item.monitor_url ? (
+                                    <Chip 
+                                      label={item.monitor_url} 
+                                      size="small" 
+                                      color="primary" 
+                                      variant="outlined" 
+                                      component="a" 
+                                      href={item.monitor_url.startsWith("http") ? item.monitor_url : `https://${item.monitor_url}`} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer" 
+                                      clickable 
+                                    />
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
+                    ) : (
+                      <Typography color="text.secondary" variant="body2">
+                        No monitoring status information available.
+                      </Typography>
+                    )}
+                  </Box>
+                </Stack>
               )}
             </Box>
           </Stack>
