@@ -985,9 +985,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
         <DialogContent dividers>
           {selectedMount && (
             <Stack spacing={2}>
-              {selectedMount.id && (
-                <DetailRow label="Internal ID" value={String(selectedMount.id)} />
-              )}
               <DetailRow label="Source" value={selectedMount.mount_source} />
               <DetailRow label="Path" value={selectedMount.mount_path} />
               <DetailRow label="Type" value={selectedMount.mount_type} />
