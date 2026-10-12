@@ -669,6 +669,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 <Tab label="Machine" />
                 <Tab label="Network" />
                 <Tab label="Softwares" />
+                <Tab label="Mounts" />
                 <Tab label="Agent Status" />
               </Tabs>
 
@@ -822,8 +823,51 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 </Box>
               )}
 
-              {/* TAB 3: AGENT STATUS PANEL */}
+              {/* TAB 3: MOUNTS PANEL */}
               {tabValue === 3 && (
+                <Box>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
+                    Storage Mount Points
+                  </Typography>
+                  {details.mounts?.length ? (
+                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300, overflow: "auto" }}>
+                      <Table size="small" stickyHeader aria-label="Mount points list">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Source</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Path</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Type</TableCell>
+                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Options</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {details.mounts.map((mount, index) => (
+                            <TableRow key={`${mount.mount_path || "mount"}-${index}`} hover>
+                              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                {mount.mount_source || "-"}
+                              </TableCell>
+                              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem", fontWeight: 500 }}>
+                                {mount.mount_path || "-"}
+                              </TableCell>
+                              <TableCell>{mount.mount_type || "-"}</TableCell>
+                              <TableCell sx={{ fontFamily: "monospace", fontSize: "0.8rem" }}>
+                                {mount.mount_opts || "-"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Typography color="text.secondary" variant="body2">
+                      No mount point details available.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              {/* TAB 4: AGENT STATUS PANEL */}
+              {tabValue === 4 && (
                 <Stack spacing={3}>
                   {/* Section 1: Info Agents Status */}
                   <Box>
