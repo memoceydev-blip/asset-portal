@@ -69,6 +69,7 @@ import { api } from "./api";
 const NAV_ITEMS = [
   { key: "summary", label: "Summary", icon: <DashboardIcon /> },
   { key: "assets", label: "Assets", icon: <ComputerIcon /> },
+  { key: "volumes", label: "Volumes", icon: <StorageIcon /> },
   { key: "softwares", label: "Softwares", icon: <SettingsApplicationsIcon /> },
   { key: "archived", label: "Archived", icon: <InventoryIcon /> },
   { key: "admin", label: "Admin Users", icon: <AdminPanelSettingsIcon /> },
@@ -86,6 +87,29 @@ const getPowerStateConfig = (state) => {
     return { color: "error", label: "Powered Off" };
   }
   return { color: "default", label: "Unknown" };
+};
+
+// Helper function to build custom header textfields for data grids
+const createHeaderWithFilter = (field, label, filterState, setFilterFn) => {
+  return () => (
+    <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}>
+      <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
+        {label}
+      </Typography>
+      <TextField
+        size="small"
+        placeholder="Filter..."
+        variant="outlined"
+        value={filterState[field] || ""}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setFilterFn(field, e.target.value)}
+        inputProps={{
+          style: { padding: "2px 6px", fontSize: "0.75rem" },
+        }}
+        sx={{ bgcolor: "background.paper" }}
+      />
+    </Box>
+  );
 };
 
 // ==========================================
@@ -510,6 +534,158 @@ function MonitoringStatCard() {
     </Card>
   );
 }
+
+// ==========================================
+// COMPONENT: Volume Details Modal
+// ==========================================
+function VolumeDetailsModal({ volumeId, open, onClose }) {
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [columnFilters, setColumnFilters] = useState({});
+
+  useEffect(() => {
+    if (!open || !volumeId) {
+      setDetails(null);
+      setError(null);
+      setColumnFilters({});
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadDetails = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await api.get(`/api/v1/volumes/${volumeId}`, {
+          signal: controller.signal,
+        });
+        setDetails(response.data);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching volume details:", err);
+        setError("Failed to load volume details. Please try again.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadDetails();
+    return () => controller.abort();
+  }, [volumeId, open]);
+
+  const handleFilterChange = (field, value) => {
+    setColumnFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const columns = useMemo(
+    () => [
+      {
+        field: "server_name",
+        headerName: "Server Name",
+        flex: 1.2,
+        renderHeader: createHeaderWithFilter("server_name", "Server Name", columnFilters, handleFilterChange),
+      },
+      {
+        field: "mount_path",
+        headerName: "Mount Path",
+        flex: 1.5,
+        renderHeader: createHeaderWithFilter("mount_path", "Mount Path", columnFilters, handleFilterChange),
+      },
+      {
+        field: "mount_type",
+        headerName: "Mount Type",
+        flex: 1,
+        renderHeader: createHeaderWithFilter("mount_type", "Mount Type", columnFilters, handleFilterChange),
+      },
+    ],
+    [columnFilters]
+  );
+
+  const filteredServers = useMemo(() => {
+    const servers = details?.servers || details?.items || (Array.isArray(details) ? details : []);
+    return servers.filter((server) => {
+      return Object.entries(columnFilters).every(([field, query]) => {
+        if (!query || query.trim() === "") return true;
+        const val = String(server[field] || "").toLowerCase();
+        return val.includes(query.trim().toLowerCase());
+      });
+    });
+  }, [details, columnFilters]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Volume Details {volumeId ? `#${volumeId}` : ""}
+        </Typography>
+        {details?.volume_name && (
+          <Chip label={`Volume: ${details.volume_name}`} color="primary" variant="outlined" size="small" />
+        )}
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ minHeight: 400, display: "flex", flexDirection: "column" }}>
+        {loading && <LinearProgress sx={{ mb: 2 }} />}
+
+        {error && (
+          <Typography color="error" align="center" sx={{ py: 3 }}>
+            {error}
+          </Typography>
+        )}
+
+        {!loading && !error && details && (
+          <Stack spacing={2} sx={{ flex: 1 }}>
+            {(details.storage_name || details.owner) && (
+              <Stack direction="row" spacing={3} sx={{ pb: 1 }}>
+                {details.storage_name && <DetailRow label="Storage Name" value={details.storage_name} />}
+                {details.owner && <DetailRow label="Owner" value={details.owner} />}
+              </Stack>
+            )}
+
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Attached Servers & Mounts
+            </Typography>
+
+            <Paper sx={{ height: 320, width: "100%", overflow: "hidden" }}>
+              <DataGrid
+                columnHeaderHeight={70}
+                rows={filteredServers}
+                columns={columns}
+                getRowId={(row) => row.id || `${row.server_name}-${row.mount_path}`}
+                pageSizeOptions={[10, 25, 50]}
+                initialState={{
+                  pagination: { paginationModel: { pageSize: 10 } },
+                }}
+                disableRowSelectionOnClick
+                sx={{
+                  bgcolor: "background.paper",
+                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                }}
+              />
+            </Paper>
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} variant="contained" size="small">
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+VolumeDetailsModal.propTypes = {
+  volumeId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 
 // ==========================================
 // COMPONENT: Asset Details Modal
@@ -1304,6 +1480,7 @@ export default function App({ mode, onToggleColorMode }) {
   const [currentView, setCurrentView] = useState("summary");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState(null);
+  const [selectedVolumeId, setSelectedVolumeId] = useState(null);
 
   // ------------------------------------------
   // PERMISSIONS / SECURITY STATE & EFFECTS
@@ -1351,6 +1528,7 @@ export default function App({ mode, onToggleColorMode }) {
 
   const handleViewChange = (targetView) => {
     setSelectedAssetId(null);
+    setSelectedVolumeId(null);
     setCurrentView(targetView);
   };
 
@@ -1392,28 +1570,6 @@ export default function App({ mode, onToggleColorMode }) {
     setAssetSearch("");
     setAssetColumnFilters({});
     setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-  };
-
-  const createHeaderWithFilter = (field, label, filterState, setFilterFn) => {
-    return () => (
-      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}>
-        <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-          {label}
-        </Typography>
-        <TextField
-          size="small"
-          placeholder="Filter..."
-          variant="outlined"
-          value={filterState[field] || ""}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setFilterFn(field, e.target.value)}
-          inputProps={{
-            style: { padding: "2px 6px", fontSize: "0.75rem" },
-          }}
-          sx={{ bgcolor: "background.paper" }}
-        />
-      </Box>
-    );
   };
 
   const assetColumns = useMemo(
@@ -1541,6 +1697,144 @@ export default function App({ mode, onToggleColorMode }) {
     if (assetSearch.trim() !== "") return true;
     return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
   }, [assetSearch, assetColumnFilters]);
+
+  // ------------------------------------------
+  // VOLUMES VIEW STATE & EFFECTS
+  // ------------------------------------------
+  const [volumeRows, setVolumeRows] = useState([]);
+  const [volumeLoading, setVolumeLoading] = useState(false);
+  const [volumeExporting, setVolumeExporting] = useState(false);
+  const [volumeRowCount, setVolumeRowCount] = useState(0);
+  const [volumeSearch, setVolumeSearch] = useState("");
+  const [debouncedVolumeSearch, setDebouncedVolumeSearch] = useState("");
+  const [volumeColumnFilters, setVolumeColumnFilters] = useState({});
+  const [debouncedVolumeColumnFilters, setDebouncedVolumeColumnFilters] = useState({});
+  const [volumePaginationModel, setVolumePaginationModel] = useState({ page: 0, pageSize: 50 });
+  const [volumeSortModel, setVolumeSortModel] = useState([{ field: "id", sort: "asc" }]);
+
+  useEffect(() => {
+    const delayHandler = setTimeout(() => setDebouncedVolumeSearch(volumeSearch), 400);
+    return () => clearTimeout(delayHandler);
+  }, [volumeSearch]);
+
+  useEffect(() => {
+    const delayHandler = setTimeout(() => {
+      setDebouncedVolumeColumnFilters(volumeColumnFilters);
+    }, 400);
+    return () => clearTimeout(volumeColumnFilters);
+  }, [volumeColumnFilters]);
+
+  const handleVolumeColumnFilterChange = (field, value) => {
+    setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+    setVolumeColumnFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleClearVolumeFilters = () => {
+    setVolumeSearch("");
+    setVolumeColumnFilters({});
+    setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const volumeColumns = useMemo(
+    () => [
+      { field: "id", headerName: "ID", flex: 0.8, renderHeader: createHeaderWithFilter("id", "ID", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "volume_name", headerName: "Volume Name", flex: 1.4, renderHeader: createHeaderWithFilter("volume_name", "Volume Name", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "storage_name", headerName: "Storage Name", flex: 1.4, renderHeader: createHeaderWithFilter("storage_name", "Storage Name", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "owner", headerName: "Owner", flex: 1.1, renderHeader: createHeaderWithFilter("owner", "Owner", volumeColumnFilters, handleVolumeColumnFilterChange) },
+    ],
+    [volumeColumnFilters]
+  );
+
+  useEffect(() => {
+    if (currentView !== "volumes" || !allowedPages.includes("volumes")) return;
+
+    const controller = new AbortController();
+    const loadVolumes = async () => {
+      setVolumeLoading(true);
+      try {
+        const sortBy = volumeSortModel[0]?.field || "id";
+        const sortDir = volumeSortModel[0]?.sort || "asc";
+
+        const filterParams = {};
+        Object.entries(debouncedVolumeColumnFilters).forEach(([field, val]) => {
+          if (val && val.trim() !== "") {
+            filterParams[`${field}_filter`] = val.trim();
+          }
+        });
+
+        const response = await api.get("/api/v1/volumes", {
+          signal: controller.signal,
+          params: {
+            page: volumePaginationModel.page + 1,
+            page_size: volumePaginationModel.pageSize,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            search: debouncedVolumeSearch || undefined,
+            ...filterParams,
+          },
+        });
+
+        setVolumeRows(response.data?.items || []);
+        setVolumeRowCount(response.data?.total || 0);
+      } catch (error) {
+        if (axios.isCancel(error) || error.name === "CanceledError") return;
+        console.error("Error loading volumes list:", error);
+      } finally {
+        if (!controller.signal.aborted) {
+          setVolumeLoading(false);
+        }
+      }
+    };
+
+    loadVolumes();
+    return () => controller.abort();
+  }, [volumePaginationModel, volumeSortModel, debouncedVolumeSearch, debouncedVolumeColumnFilters, currentView, allowedPages]);
+
+  const handleExportVolumesExcel = async () => {
+    setVolumeExporting(true);
+    try {
+      const sortBy = volumeSortModel[0]?.field || "id";
+      const sortDir = volumeSortModel[0]?.sort || "asc";
+
+      const filterParams = {};
+      Object.entries(debouncedVolumeColumnFilters).forEach(([field, val]) => {
+        if (val && val.trim() !== "") {
+          filterParams[`${field}_filter`] = val.trim();
+        }
+      });
+
+      const response = await api.get("/api/v1/volumes", {
+        params: {
+          page: 1,
+          page_size: 100000,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          search: debouncedVolumeSearch || undefined,
+          ...filterParams,
+        },
+      });
+
+      const fullItems = response.data?.items || [];
+      if (fullItems.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(fullItems);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Volumes");
+      XLSX.writeFile(workbook, "volumes_full_export.xlsx");
+    } catch (error) {
+      console.error("Error fetching full volumes set for export:", error);
+    } finally {
+      setVolumeExporting(false);
+    }
+  };
+
+  const hasActiveVolumeFilters = useMemo(() => {
+    if (volumeSearch.trim() !== "") return true;
+    return Object.values(volumeColumnFilters).some((val) => val && val.trim() !== "");
+  }, [volumeSearch, volumeColumnFilters]);
 
   // ------------------------------------------
   // ARCHIVED VIEW STATE & EFFECTS
@@ -1833,6 +2127,7 @@ export default function App({ mode, onToggleColorMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
             {currentView === "summary" && "Infrastructure Metrics"}
             {currentView === "assets" && "Asset Master"}
+            {currentView === "volumes" && "Storage Volumes"}
             {currentView === "softwares" && "Softwares Inventory"}
             {currentView === "archived" && "Archived Assets"}
             {currentView === "admin" && "User Administration"}
@@ -2050,6 +2345,76 @@ export default function App({ mode, onToggleColorMode }) {
               </>
             )}
 
+            {currentView === "volumes" && allowedPages.includes("volumes") && (
+              <>
+                <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search Volumes"
+                    value={volumeSearch}
+                    onChange={(e) => {
+                      setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+                      setVolumeSearch(e.target.value);
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownloadOutlinedIcon />}
+                    onClick={handleExportVolumesExcel}
+                    disabled={volumeExporting || volumeRowCount === 0}
+                    sx={actionButtonSx}
+                  >
+                    {volumeExporting ? "Exporting..." : "Export Excel"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FilterAltOffOutlinedIcon />}
+                    onClick={handleClearVolumeFilters}
+                    disabled={!hasActiveVolumeFilters}
+                    sx={{
+                      ...actionButtonSx,
+                      "&:hover": {
+                        bgcolor: "error.main",
+                        color: "error.contrastText",
+                        borderColor: "error.main",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transform: "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </Paper>
+
+                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+                  <DataGrid
+                    columnHeaderHeight={70}
+                    rows={volumeRows}
+                    columns={volumeColumns}
+                    loading={volumeLoading}
+                    rowCount={volumeRowCount}
+                    pagination
+                    paginationMode="server"
+                    sortingMode="server"
+                    paginationModel={volumePaginationModel}
+                    onPaginationModelChange={setVolumePaginationModel}
+                    sortModel={volumeSortModel}
+                    onSortModelChange={setVolumeSortModel}
+                    pageSizeOptions={[25, 50, 100]}
+                    disableRowSelectionOnClick
+                    onRowClick={(params) => setSelectedVolumeId(params.row.id)}
+                    sx={{
+                      bgcolor: "background.paper",
+                      cursor: "pointer",
+                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                    }}
+                  />
+                </Paper>
+              </>
+            )}
+
             {currentView === "archived" && allowedPages.includes("archived") && (
               <>
                 <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
@@ -2214,6 +2579,12 @@ export default function App({ mode, onToggleColorMode }) {
         assetId={selectedAssetId}
         open={Boolean(selectedAssetId)}
         onClose={() => setSelectedAssetId(null)}
+      />
+
+      <VolumeDetailsModal
+        volumeId={selectedVolumeId}
+        open={Boolean(selectedVolumeId)}
+        onClose={() => setSelectedVolumeId(null)}
       />
     </Box>
   );
