@@ -593,6 +593,12 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
         renderHeader: createHeaderWithFilter("server_name", "Server Name", columnFilters, handleFilterChange),
       },
       {
+        field: "server_owner",
+        headerName: "Server Owner",
+        flex: 1.2,
+        renderHeader: createHeaderWithFilter("server_owner", "Server Owner", columnFilters, handleFilterChange),
+      },
+      {
         field: "mount_path",
         headerName: "Mount Path",
         flex: 1.5,
