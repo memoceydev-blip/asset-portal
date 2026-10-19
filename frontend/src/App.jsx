@@ -1210,8 +1210,78 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                                 <TableRow key={`${item.monitor_name || "monitor"}-${index}`} hover>
                                   <TableCell sx={{ fontWeight: 500 }}>{item.monitor_name || "-"}</TableCell>
                                   <TableCell>{item.monitor_status || "-"}</TableCell>
-                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "
+                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                                    {item.monitor_url ? (
+                                      <Chip 
+                                        label={item.monitor_url} 
+                                        size="small" 
+                                        color="primary" 
+                                        variant="outlined" 
+                                        component="a" 
+                                        href={item.monitor_url.startsWith("http") ? item.monitor_url : `https://${item.monitor_url}`} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        clickable 
+                                      />
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Typography color="text.secondary" variant="body2">
+                          No monitoring status information available.
+                        </Typography>
+                      )}
+                    </Box>
+                  </Stack>
+                )}
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+      </Dialog>
 
+      {/* SUB-DIALOG: MOUNT DETAILS POPUP */}
+      <Dialog 
+        open={Boolean(selectedMount)} 
+        onClose={() => setSelectedMount(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}>
+          <StorageIcon color="primary" />
+          Mount Point Details
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedMount && (
+            <Stack spacing={2}>
+              <DetailRow label="Source" value={selectedMount.mount_source} />
+              <DetailRow label="Path" value={selectedMount.mount_path} />
+              <DetailRow label="Type" value={selectedMount.mount_type} />
+              <DetailRow label="Options" value={selectedMount.mount_opts} />
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedMount(null)} variant="contained" size="small">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
+AssetDetailsModal.propTypes = {
+  assetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  open: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+};
 // Common Action Button Styling Configuration
 const actionButtonSx = {
   borderRadius: 2,
