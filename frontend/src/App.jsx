@@ -775,6 +775,28 @@ function AssetDetailsModal({ assetId, open, onClose }) {
     return () => controller.abort();
   }, [assetId, open]);
 
+  // Determine if current asset type is storage
+  const isStorage = useMemo(() => {
+    return details?.type?.toLowerCase() === "storage";
+  }, [details?.type]);
+
+  // Dynamically build tab list based on asset type
+  const availableTabs = useMemo(() => {
+    const tabs = ["Machine", "Network"];
+    if (!isStorage) {
+      tabs.push("Softwares", "Mounts");
+    }
+    tabs.push("Agent Status");
+    return tabs;
+  }, [isStorage]);
+
+  // Ensure selected tab index stays within bounds when details load
+  useEffect(() => {
+    if (tabValue >= availableTabs.length) {
+      setTabValue(0);
+    }
+  }, [availableTabs, tabValue]);
+
   const filteredSoftware = useMemo(() => {
     if (!details?.software) return [];
     const pattern = softwareFilter.trim().toLowerCase();
@@ -888,15 +910,13 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   variant="fullWidth"
                   sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
                 >
-                  <Tab label="Machine" />
-                  <Tab label="Network" />
-                  <Tab label="Softwares" />
-                  <Tab label="Mounts" />
-                  <Tab label="Agent Status" />
+                  {availableTabs.map((label) => (
+                    <Tab key={label} label={label} />
+                  ))}
                 </Tabs>
 
-                {/* TAB 0: MACHINE PANELS */}
-                {tabValue === 0 && (
+                {/* DYNAMIC TAB RENDERING BY LABEL */}
+                {availableTabs[tabValue] === "Machine" && (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -970,8 +990,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   </Stack>
                 )}
 
-                {/* TAB 1: NETWORK PANELS */}
-                {tabValue === 1 && (
+                {availableTabs[tabValue] === "Network" && (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
@@ -1009,8 +1028,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   </Stack>
                 )}
 
-                {/* TAB 2: SOFTWARES PANEL */}
-                {tabValue === 2 && (
+                {availableTabs[tabValue] === "Softwares" && (
                   <Box>
                     <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Software Dependencies</Typography>
@@ -1045,8 +1063,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   </Box>
                 )}
 
-                {/* TAB 3: MOUNTS PANEL */}
-                {tabValue === 3 && (
+                {availableTabs[tabValue] === "Mounts" && (
                   <Box>
                     <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
                       Storage Mount Points
@@ -1091,8 +1108,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   </Box>
                 )}
 
-                {/* TAB 4: AGENT STATUS PANEL */}
-                {tabValue === 4 && (
+                {availableTabs[tabValue] === "Agent Status" && (
                   <Stack spacing={3}>
                     {/* Section 1: Info Agents Status */}
                     <Box>
@@ -1151,78 +1167,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                                 <TableRow key={`${item.monitor_name || "monitor"}-${index}`} hover>
                                   <TableCell sx={{ fontWeight: 500 }}>{item.monitor_name || "-"}</TableCell>
                                   <TableCell>{item.monitor_status || "-"}</TableCell>
-                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                                    {item.monitor_url ? (
-                                      <Chip 
-                                        label={item.monitor_url} 
-                                        size="small" 
-                                        color="primary" 
-                                        variant="outlined" 
-                                        component="a" 
-                                        href={item.monitor_url.startsWith("http") ? item.monitor_url : `https://${item.monitor_url}`} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        clickable 
-                                      />
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Typography color="text.secondary" variant="body2">
-                          No monitoring status information available.
-                        </Typography>
-                      )}
-                    </Box>
-                  </Stack>
-                )}
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* SUB-DIALOG: MOUNT DETAILS POPUP */}
-      <Dialog 
-        open={Boolean(selectedMount)} 
-        onClose={() => setSelectedMount(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}>
-          <StorageIcon color="primary" />
-          Mount Point Details
-        </DialogTitle>
-        <DialogContent dividers>
-          {selectedMount && (
-            <Stack spacing={2}>
-              <DetailRow label="Source" value={selectedMount.mount_source} />
-              <DetailRow label="Path" value={selectedMount.mount_path} />
-              <DetailRow label="Type" value={selectedMount.mount_type} />
-              <DetailRow label="Options" value={selectedMount.mount_opts} />
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setSelectedMount(null)} variant="contained" size="small">
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-}
-
-AssetDetailsModal.propTypes = {
-  assetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-  open: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-};
+                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "
 
 // Common Action Button Styling Configuration
 const actionButtonSx = {
