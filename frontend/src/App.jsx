@@ -541,6 +541,7 @@ function MonitoringStatCard() {
 function VolumeDetailsModal({ volumeId, open, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState(null);
   const [columnFilters, setColumnFilters] = useState({});
 
@@ -624,6 +625,39 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
       });
     });
   }, [details, columnFilters]);
+
+  // Export current volume attached servers to Excel file
+  const handleExportVolumeDetailsExcel = async () => {
+    setExporting(true);
+    try {
+      if (!filteredServers || filteredServers.length === 0) return;
+
+      const exportData = filteredServers.map((srv) => ({
+        "Volume ID": volumeId,
+        "Volume Name": details?.volume_name || "",
+        "Storage Name": details?.storage_name || "",
+        "Volume Owner": details?.owner || "",
+        "Server Name": srv.server_name || "",
+        "Server Owner": srv.server_owner || "",
+        "Mount Path": srv.mount_path || "",
+        "Mount Type": srv.mount_type || "",
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Volume Details");
+      
+      const fileName = details?.volume_name 
+        ? `volume_${details.volume_name}_details.xlsx` 
+        : `volume_${volumeId}_details.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
+    } catch (err) {
+      console.error("Error exporting volume details to Excel:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -712,7 +746,16 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
           </Stack>
         )}
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ px: 3, py: 2, justifyContent: "space-between" }}>
+        <Button
+          variant="outlined"
+          startIcon={<FileDownloadOutlinedIcon />}
+          onClick={handleExportVolumeDetailsExcel}
+          disabled={loading || exporting || !filteredServers.length}
+          sx={actionButtonSx}
+        >
+          {exporting ? "Exporting..." : "Export Excel"}
+        </Button>
         <Button onClick={onClose} variant="contained" size="small">
           Close
         </Button>
