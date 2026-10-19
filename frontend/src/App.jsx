@@ -621,12 +621,53 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+      <DialogTitle
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 2,
+        }}
+      >
+        <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
           Volume Details {volumeId ? `#${volumeId}` : ""}
         </Typography>
-        {details?.volume_name && (
-          <Chip label={`Volume: ${details.volume_name}`} color="primary" variant="outlined" size="small" />
+
+        {!loading && details && (
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+            justifyContent="flex-end"
+          >
+            {details.volume_name && (
+              <Chip
+                label={`Volume: ${details.volume_name}`}
+                size="small"
+                color="primary"
+                variant="outlined"
+              />
+            )}
+            {details.storage_name && (
+              <Chip
+                label={`Storage: ${details.storage_name}`}
+                size="small"
+                color="secondary"
+                variant="outlined"
+              />
+            )}
+            {details.owner && (
+              <Chip
+                label={`Owner: ${details.owner}`}
+                size="small"
+                variant="filled"
+                sx={{ bgcolor: "action.selected" }}
+              />
+            )}
+          </Stack>
         )}
       </DialogTitle>
 
@@ -641,18 +682,11 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
 
         {!loading && !error && details && (
           <Stack spacing={2} sx={{ flex: 1 }}>
-            {(details.storage_name || details.owner) && (
-              <Stack direction="row" spacing={3} sx={{ pb: 1 }}>
-                {details.storage_name && <DetailRow label="Storage Name" value={details.storage_name} />}
-                {details.owner && <DetailRow label="Owner" value={details.owner} />}
-              </Stack>
-            )}
-
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               Attached Servers & Mounts
             </Typography>
 
-            <Paper sx={{ height: 320, width: "100%", overflow: "hidden" }}>
+            <Paper sx={{ height: 340, width: "100%", overflow: "hidden" }}>
               <DataGrid
                 columnHeaderHeight={70}
                 rows={filteredServers}
@@ -665,7 +699,7 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
                 disableRowSelectionOnClick
                 sx={{
                   bgcolor: "background.paper",
-                  '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                  "& .MuiDataGrid-columnHeaders": { bgcolor: "background.paper" },
                 }}
               />
             </Paper>
