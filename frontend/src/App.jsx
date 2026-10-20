@@ -1051,61 +1051,124 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 </Box>
               )}
 
-              {/* TAB 3: AGENT STATUS */}
-              {tabValue === 3 && (
-                <Box>
-                  <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                    Monitored Agents
-                  </Typography>
-                  {details.agents?.length ? (
-                    <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 300 }}>
-                      <Table size="small" stickyHeader>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
-                            <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {details.agents.map((agent, index) => (
-                            <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
-                              <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
-                              <TableCell>
-                                <Chip
-                                  label={agent.agent_status || "Unknown"}
-                                  size="small"
-                                  color={
-                                    agent.agent_status?.toLowerCase().includes("running") ||
-                                    agent.agent_status?.toLowerCase().includes("active") ||
-                                    agent.agent_status?.toLowerCase().includes("ok")
-                                      ? "success"
-                                      : "default"
-                                  }
-                                  variant="outlined"
-                                />
-                              </TableCell>
-                              <TableCell sx={{ fontFamily: "monospace" }}>{agent.agent_last || "-"}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : (
-                    <Typography color="text.secondary" variant="body2">
-                      No agent monitoring status records found.
-                    </Typography>
-                  )}
-                </Box>
-              )}
-            </Box>
-          </Stack>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
+             {/* TAB 3: AGENT STATUS PANEL */}
+{tabValue === 3 && (
+  <Stack spacing={3}>
+    {/* Section 1: Info Agents Status */}
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+        Info Agents Status
+      </Typography>
+      {details.agents?.length ? (
+        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
+          <Table size="small" stickyHeader aria-label="Info agents status table">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {details.agents.map((agent, index) => (
+                <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
+                  <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={agent.agent_status || "Unknown"}
+                      size="small"
+                      color={
+                        agent.agent_status?.toLowerCase().includes("running") ||
+                        agent.agent_status?.toLowerCase().includes("active") ||
+                        agent.agent_status?.toLowerCase().includes("ok")
+                          ? "success"
+                          : "default"
+                      }
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
+                    {agent.agent_last || "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Typography color="text.secondary" variant="body2">
+          No agent status information available.
+        </Typography>
+      )}
+    </Box>
 
+    <Divider variant="dashed" />
+
+    {/* Section 2: Monitoring Status */}
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+        Monitoring Status
+      </Typography>
+      {details.monitoring?.length ? (
+        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
+          <Table size="small" stickyHeader aria-label="Monitoring status table">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Status</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor URL</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {details.monitoring.map((mon, index) => (
+                <TableRow key={`${mon.monitor_name || "monitor"}-${index}`} hover>
+                  <TableCell sx={{ fontWeight: 500 }}>{mon.monitor_name || "-"}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={mon.monitor_status || "Unknown"}
+                      size="small"
+                      color={
+                        mon.monitor_status?.toLowerCase().includes("up") ||
+                        mon.monitor_status?.toLowerCase().includes("ok") ||
+                        mon.monitor_status?.toLowerCase().includes("active")
+                          ? "success"
+                          : mon.monitor_status?.toLowerCase().includes("down") ||
+                            mon.monitor_status?.toLowerCase().includes("critical")
+                          ? "error"
+                          : "default"
+                      }
+                      variant="outlined"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {mon.monitor_url ? (
+                      <Typography
+                        variant="body2"
+                        component="a"
+                        href={mon.monitor_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ color: "primary.main", textDecoration: "none", "&:hover": { textDecoration: "underline" } }}
+                      >
+                        {mon.monitor_url}
+                      </Typography>
+                    ) : (
+                      "-"
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Typography color="text.secondary" variant="body2">
+          No monitoring status records available.
+        </Typography>
+      )}
+    </Box>
+  </Stack>
+)}
 AssetDetailsModal.propTypes = {
   assetId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   open: PropTypes.bool.isRequired,
