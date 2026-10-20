@@ -11,20 +11,25 @@ import {
   Chip,
   Container,
   Dialog,
+  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
   Drawer,
+  FormControl,
   FormControlLabel,
   Grid,
   IconButton,
+  InputLabel,
   LinearProgress,
   List,
   ListItem,
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Tab,
   Tabs,
@@ -73,7 +78,41 @@ const NAV_ITEMS = [
   { key: "admin", label: "Admin Users", icon: <AdminPanelSettingsIcon /> },
 ];
 
-// Helper function to build custom header textfields for data grids
+// Common Action Button Styling Configuration
+const actionButtonSx = {
+  borderRadius: 2,
+  px: 2.5,
+  py: 0.8,
+  fontWeight: 600,
+  letterSpacing: "0.2px",
+  textTransform: "none",
+  whiteSpace: "nowrap",
+  borderColor: "action.disabledBackground",
+  color: "text.primary",
+  bgcolor: "action.hover",
+  transition: "all 0.2s ease-in-out",
+  "&:hover": {
+    bgcolor: "primary.main",
+    color: "primary.contrastText",
+    borderColor: "primary.main",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+    transform: "translateY(-1px)",
+  },
+};
+
+// HELPER: Power State Visual Configuration
+const getPowerStateConfig = (state) => {
+  const normalized = state?.toLowerCase() || "";
+  if (normalized.includes("on")) {
+    return { color: "success", label: "Powered On" };
+  }
+  if (normalized.includes("off")) {
+    return { color: "error", label: "Powered Off" };
+  }
+  return { color: "default", label: "Unknown" };
+};
+
+// HELPER: Custom header textfields for data grids
 const createHeaderWithFilter = (field, label, filterState, setFilterFn) => {
   return () => (
     <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}>
@@ -94,342 +133,6 @@ const createHeaderWithFilter = (field, label, filterState, setFilterFn) => {
       />
     </Box>
   );
-};
-
-const getPowerStateConfig = (state) => {
-  const normalized = state?.toLowerCase() || "";
-  if (normalized.includes("on")) {
-    return { color: "success", label: "Powered On" };
-  }
-  if (normalized.includes("off")) {
-    return { color: "error", label: "Powered Off" };
-  }
-  return { color: "default", label: "Unknown" };
-};
-
-// ==========================================
-// COMPONENT: Impersonation Asset View
-// ==========================================
-function ImpersonationView({ onSelectAsset }) {
-  const [owners, setOwners] = useState([]);
-  const [selectedOwner, setSelectedOwner] = useState(null);
-  const [ownersLoading, setOwnersLoading] = useState(false);
-
-  const [assetRows, setAssetRows] = useState([]);
-  const [assetLoading, setAssetLoading] = useState(false);
-  const [assetExporting, setAssetExporting] = useState(false);
-  const [assetRowCount, setAssetRowCount] = useState(0);
-  const [assetSearch, setAssetSearch] = useState("");
-  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
-  const [assetColumnFilters, setAssetColumnFilters] = useState({});
-  const [debouncedAssetColumnFilters, setDebouncedAssetColumnFilters] = useState({});
-  const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
-  const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
-
-  // Fetch owners list on mount
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchOwners = async () => {
-      setOwnersLoading(true);
-      try {
-        const response = await api.get("/api/v1/assets/owners", { signal: controller.signal });
-        const items = response.data?.items || response.data || [];
-        setOwners(items);
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error("Error fetching owners list:", err);
-      } finally {
-        if (!controller.signal.aborted) {
-          setOwnersLoading(false);
-        }
-      }
-    };
-
-    fetchOwners();
-    return () => controller.abort();
-  }, []);
-
-  // Debounce search input
-  useEffect(() => {
-    const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
-    return () => clearTimeout(delayHandler);
-  }, [assetSearch]);
-
-  // Debounce column filters input
-  useEffect(() => {
-    const delayHandler = setTimeout(() => {
-      setDebouncedAssetColumnFilters(assetColumnFilters);
-    }, 400);
-    return () => clearTimeout(assetColumnFilters);
-  }, [assetColumnFilters]);
-
-  const handleColumnFilterChange = (field, value) => {
-    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-    setAssetColumnFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleClearAssetFilters = () => {
-    setAssetSearch("");
-    setAssetColumnFilters({});
-    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-  };
-
-  const assetColumns = useMemo(
-    () => [
-      { field: "id", headerName: "ID", flex: 0.8, renderHeader: createHeaderWithFilter("id", "ID", assetColumnFilters, handleColumnFilterChange) },
-      { field: "name", headerName: "Name", flex: 1.2, renderHeader: createHeaderWithFilter("name", "Name", assetColumnFilters, handleColumnFilterChange) },
-      { field: "tag", headerName: "Tag", flex: 1, renderHeader: createHeaderWithFilter("tag", "Tag", assetColumnFilters, handleColumnFilterChange) },
-      { field: "type", headerName: "Type", flex: 1, renderHeader: createHeaderWithFilter("type", "Type", assetColumnFilters, handleColumnFilterChange) },
-      { field: "owner", headerName: "Owner", flex: 1.1, renderHeader: createHeaderWithFilter("owner", "Owner", assetColumnFilters, handleColumnFilterChange) },
-      { field: "location", headerName: "Location", flex: 1.1, renderHeader: createHeaderWithFilter("location", "Location", assetColumnFilters, handleColumnFilterChange) },
-      { field: "os", headerName: "OS", flex: 1.1, renderHeader: createHeaderWithFilter("os", "OS", assetColumnFilters, handleColumnFilterChange) },
-      { field: "status", headerName: "Status", flex: 0.9, renderHeader: createHeaderWithFilter("status", "Status", assetColumnFilters, handleColumnFilterChange) },
-      { 
-        field: "power_state", 
-        headerName: "Power State", 
-        flex: 1.1,
-        renderHeader: createHeaderWithFilter("power_state", "Power State", assetColumnFilters, handleColumnFilterChange),
-        renderCell: (params) => {
-          const cfg = getPowerStateConfig(params.value);
-          return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
-              <Box 
-                sx={{ 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: "50%", 
-                  bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` 
-                }} 
-              />
-              <Typography variant="body2">{cfg.label}</Typography>
-            </Box>
-          );
-        }
-      },
-      { field: "ips", headerName: "IPs", flex: 1.3, renderHeader: createHeaderWithFilter("ips", "IPs", assetColumnFilters, handleColumnFilterChange) },
-      { field: "alias", headerName: "Alias", flex: 1.2, renderHeader: createHeaderWithFilter("alias", "Alias", assetColumnFilters, handleColumnFilterChange) },
-    ],
-    [assetColumnFilters]
-  );
-
-  // Load owner's assets upon owner selection or filter updates
-  useEffect(() => {
-    if (!selectedOwner?.owner_id) {
-      setAssetRows([]);
-      setAssetRowCount(0);
-      return;
-    }
-
-    const controller = new AbortController();
-    const loadOwnerAssets = async () => {
-      setAssetLoading(true);
-      try {
-        const sortBy = assetSortModel[0]?.field || "id";
-        const sortDir = assetSortModel[0]?.sort || "asc";
-
-        const filterParams = {};
-        Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
-          if (val && val.trim() !== "") {
-            filterParams[`${field}_filter`] = val.trim();
-          }
-        });
-
-        const response = await api.get(`/api/v1/assets/owners/${selectedOwner.owner_id}`, {
-          signal: controller.signal,
-          params: {
-            page: assetPaginationModel.page + 1,
-            page_size: assetPaginationModel.pageSize,
-            sort_by: sortBy,
-            sort_dir: sortDir,
-            search: debouncedAssetSearch || undefined,
-            ...filterParams,
-          },
-        });
-
-        setAssetRows(response.data?.items || []);
-        setAssetRowCount(response.data?.total || 0);
-      } catch (error) {
-        if (axios.isCancel(error) || error.name === "CanceledError") return;
-        console.error("Error loading owner assets list:", error);
-      } finally {
-        if (!controller.signal.aborted) {
-          setAssetLoading(false);
-        }
-      }
-    };
-
-    loadOwnerAssets();
-    return () => controller.abort();
-  }, [selectedOwner, assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters]);
-
-  // Export impersonated assets list to Excel
-  const handleExportAssetsExcel = async () => {
-    if (!selectedOwner?.owner_id) return;
-
-    setAssetExporting(true);
-    try {
-      const sortBy = assetSortModel[0]?.field || "id";
-      const sortDir = assetSortModel[0]?.sort || "asc";
-
-      const filterParams = {};
-      Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
-        if (val && val.trim() !== "") {
-          filterParams[`${field}_filter`] = val.trim();
-        }
-      });
-
-      const response = await api.get(`/api/v1/assets/owners/${selectedOwner.owner_id}`, {
-        params: {
-          page: 1,
-          page_size: 100000,
-          sort_by: sortBy,
-          sort_dir: sortDir,
-          search: debouncedAssetSearch || undefined,
-          ...filterParams,
-        },
-      });
-
-      const fullItems = response.data?.items || [];
-      if (fullItems.length === 0) return;
-
-      const worksheet = XLSX.utils.json_to_sheet(fullItems);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Impersonated_Assets");
-      XLSX.writeFile(workbook, `impersonated_assets_${selectedOwner.owner_name || selectedOwner.owner_id}.xlsx`);
-    } catch (error) {
-      console.error("Error exporting impersonated assets set:", error);
-    } finally {
-      setAssetExporting(false);
-    }
-  };
-
-  const hasActiveAssetFilters = useMemo(() => {
-    if (assetSearch.trim() !== "") return true;
-    return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
-  }, [assetSearch, assetColumnFilters]);
-
-  const actionButtonSx = {
-    borderRadius: 2,
-    px: 2.5,
-    py: 0.8,
-    fontWeight: 600,
-    letterSpacing: "0.2px",
-    textTransform: "none",
-    whiteSpace: "nowrap",
-    borderColor: "action.disabledBackground",
-    color: "text.primary",
-    bgcolor: "action.hover",
-    transition: "all 0.2s ease-in-out",
-    "&:hover": {
-      bgcolor: "primary.main",
-      color: "primary.contrastText",
-      borderColor: "primary.main",
-      boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      transform: "translateY(-1px)",
-    },
-  };
-
-  return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 2, display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
-        {/* Owner Selector Combobox */}
-        <Autocomplete
-          size="small"
-          options={owners}
-          loading={ownersLoading}
-          getOptionLabel={(option) => option.owner_name || String(option.owner_id || "")}
-          isOptionEqualToValue={(option, value) => option.owner_id === value.owner_id}
-          value={selectedOwner}
-          onChange={(_, newValue) => {
-            setSelectedOwner(newValue);
-            setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-          }}
-          sx={{ minWidth: 280, flex: 1 }}
-          renderInput={(params) => (
-            <TextField {...params} label="Select Asset Owner (Impersonate)" placeholder="Choose owner..." />
-          )}
-        />
-
-        {/* Global Search Bar */}
-        <TextField
-          size="small"
-          label="Search Assets"
-          value={assetSearch}
-          disabled={!selectedOwner}
-          onChange={(e) => {
-            setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
-            setAssetSearch(e.target.value);
-          }}
-          sx={{ flex: 1.5, minWidth: 220 }}
-        />
-
-        {/* Excel Export Button */}
-        <Button
-          variant="outlined"
-          startIcon={<FileDownloadOutlinedIcon />}
-          onClick={handleExportAssetsExcel}
-          disabled={!selectedOwner || assetExporting || assetRowCount === 0}
-          sx={actionButtonSx}
-        >
-          {assetExporting ? "Exporting..." : "Export Excel"}
-        </Button>
-
-        {/* Clear Filters Button */}
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<FilterAltOffOutlinedIcon />}
-          onClick={handleClearAssetFilters}
-          disabled={!selectedOwner || !hasActiveAssetFilters}
-          sx={{
-            ...actionButtonSx,
-            "&:hover": {
-              bgcolor: "error.main",
-              color: "error.contrastText",
-              borderColor: "error.main",
-              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              transform: "translateY(-1px)",
-            },
-          }}
-        >
-          Clear Filters
-        </Button>
-      </Paper>
-
-      {/* Assets Grid */}
-      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-        <DataGrid
-          columnHeaderHeight={70}
-          rows={assetRows}
-          columns={assetColumns}
-          loading={assetLoading}
-          rowCount={assetRowCount}
-          pagination
-          paginationMode="server"
-          sortingMode="server"
-          paginationModel={assetPaginationModel}
-          onPaginationModelChange={setAssetPaginationModel}
-          sortModel={assetSortModel}
-          onSortModelChange={setAssetSortModel}
-          pageSizeOptions={[25, 50, 100]}
-          disableRowSelectionOnClick
-          onRowClick={(params) => onSelectAsset(params.row.id)}
-          sx={{
-            bgcolor: "background.paper",
-            cursor: selectedOwner ? "pointer" : "default",
-            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-          }}
-        />
-      </Paper>
-    </Box>
-  );
-}
-
-ImpersonationView.propTypes = {
-  onSelectAsset: PropTypes.func.isRequired,
 };
 
 // ==========================================
@@ -520,12 +223,7 @@ function StatCard({
   return (
     <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
       <CardContent>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          sx={{ mb: 0.5 }}
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Box>
             <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
               {title}
@@ -594,21 +292,14 @@ function StatCard({
             </Grid>
 
             <Grid item xs={12} md={7}>
-              <TableContainer
-                component={Paper}
-                variant="outlined"
-                sx={{ maxHeight: 280, overflow: "auto" }}
-              >
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 280, overflow: "auto" }}>
                 <Table stickyHeader size="small" aria-label={`${title} counts table`}>
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>
                         {tableHeaderLabel}
                       </TableCell>
-                      <TableCell
-                        align="right"
-                        sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}
-                      >
+                      <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}>
                         Count
                       </TableCell>
                     </TableRow>
@@ -619,10 +310,7 @@ function StatCard({
                         <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
                           {row.name || "Unknown"}
                         </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
-                        >
+                        <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}>
                           {row.count?.toLocaleString() || 0}
                         </TableCell>
                       </TableRow>
@@ -666,7 +354,6 @@ function MonitoringStatCard() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Load available monitors dropdown list
   useEffect(() => {
     const controller = new AbortController();
     const fetchMonitors = async () => {
@@ -695,7 +382,6 @@ function MonitoringStatCard() {
     return () => controller.abort();
   }, []);
 
-  // Fetch status distribution metrics for selected monitor
   useEffect(() => {
     if (!selectedMonitor) return;
 
@@ -736,12 +422,7 @@ function MonitoringStatCard() {
   return (
     <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
       <CardContent>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          sx={{ mb: 0.5 }}
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Box>
             <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
               Monitoring status
@@ -811,21 +492,14 @@ function MonitoringStatCard() {
             </Grid>
 
             <Grid item xs={12} md={7}>
-              <TableContainer
-                component={Paper}
-                variant="outlined"
-                sx={{ maxHeight: 280, overflow: "auto" }}
-              >
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 280, overflow: "auto" }}>
                 <Table stickyHeader size="small" aria-label="Monitoring status table">
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>
                         Status
                       </TableCell>
-                      <TableCell
-                        align="right"
-                        sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}
-                      >
+                      <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}>
                         Count
                       </TableCell>
                     </TableRow>
@@ -836,10 +510,7 @@ function MonitoringStatCard() {
                         <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
                           {row.name || "Unknown"}
                         </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
-                        >
+                        <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}>
                           {row.count?.toLocaleString() || 0}
                         </TableCell>
                       </TableRow>
@@ -946,7 +617,6 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
     });
   }, [details, columnFilters]);
 
-  // Export current volume attached servers to Excel file
   const handleExportVolumeDetailsExcel = async () => {
     setExporting(true);
     try {
@@ -995,37 +665,15 @@ function VolumeDetailsModal({ volumeId, open, onClose }) {
         </Typography>
 
         {!loading && details && (
-          <Stack
-            direction="row"
-            spacing={1.5}
-            alignItems="center"
-            flexWrap="wrap"
-            useFlexGap
-            justifyContent="flex-end"
-          >
+          <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
             {details.volume_name && (
-              <Chip
-                label={`Volume: ${details.volume_name}`}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
+              <Chip label={`Volume: ${details.volume_name}`} size="small" color="primary" variant="outlined" />
             )}
             {details.storage_name && (
-              <Chip
-                label={`Storage: ${details.storage_name}`}
-                size="small"
-                color="secondary"
-                variant="outlined"
-              />
+              <Chip label={`Storage: ${details.storage_name}`} size="small" color="secondary" variant="outlined" />
             )}
             {details.owner && (
-              <Chip
-                label={`Owner: ${details.owner}`}
-                size="small"
-                variant="filled"
-                sx={{ bgcolor: "action.selected" }}
-              />
+              <Chip label={`Owner: ${details.owner}`} size="small" variant="filled" sx={{ bgcolor: "action.selected" }} />
             )}
           </Stack>
         )}
@@ -1099,8 +747,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
   const [error, setError] = useState(null);
   const [softwareFilter, setSoftwareFilter] = useState("");
   const [tabValue, setTabValue] = useState(0);
-
-  // Selected mount details modal state
   const [selectedMount, setSelectedMount] = useState(null);
 
   useEffect(() => {
@@ -1138,12 +784,10 @@ function AssetDetailsModal({ assetId, open, onClose }) {
     return () => controller.abort();
   }, [assetId, open]);
 
-  // Determine if current asset type is storage
   const isStorage = useMemo(() => {
     return details?.type?.toLowerCase() === "storage";
   }, [details?.type]);
 
-  // Dynamically build tab list based on asset type
   const availableTabs = useMemo(() => {
     const tabs = ["Machine", "Network"];
     if (!isStorage) {
@@ -1153,7 +797,6 @@ function AssetDetailsModal({ assetId, open, onClose }) {
     return tabs;
   }, [isStorage]);
 
-  // Ensure selected tab index stays within bounds when details load
   useEffect(() => {
     if (tabValue >= availableTabs.length) {
       setTabValue(0);
@@ -1179,15 +822,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
   return (
     <>
       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-        <DialogTitle 
-          sx={{ 
-            display: "flex", 
-            alignItems: "flex-start", 
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 2
-          }}
-        >
+        <DialogTitle sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 2 }}>
           <Stack spacing={0.5}>
             <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
               Asset Details {assetId ? `#${assetId}` : ""}
@@ -1195,15 +830,8 @@ function AssetDetailsModal({ assetId, open, onClose }) {
             
             {!loading && details && (
               <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mt: 0.5 }}>
-                <PowerSettingsNewIcon 
-                  color={powerConfig.color === "default" ? "disabled" : powerConfig.color} 
-                  sx={{ fontSize: "1rem" }} 
-                />
-                <Typography 
-                  variant="caption" 
-                  color={powerConfig.color === "default" ? "text.secondary" : `${powerConfig.color}.main`}
-                  sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}
-                >
+                <PowerSettingsNewIcon color={powerConfig.color === "default" ? "disabled" : powerConfig.color} sx={{ fontSize: "1rem" }} />
+                <Typography variant="caption" color={powerConfig.color === "default" ? "text.secondary" : `${powerConfig.color}.main`} sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                   {powerConfig.label}
                 </Typography>
               </Box>
@@ -1219,21 +847,9 @@ function AssetDetailsModal({ assetId, open, onClose }) {
               </Stack>
 
               <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap justifyContent="flex-end">
-                {details.location && (
-                  <Chip label={`Location: ${details.location}`} size="small" color="default" variant="outlined" />
-                )}
+                {details.location && <Chip label={`Location: ${details.location}`} size="small" color="default" variant="outlined" />}
                 {details?.ilo && (
-                  <Chip 
-                    label={`iLO: ${details.ilo}`} 
-                    size="small" 
-                    color="info" 
-                    variant="outlined" 
-                    component="a" 
-                    href={`https://${details.ilo}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    clickable 
-                  />
+                  <Chip label={`iLO: ${details.ilo}`} size="small" color="info" variant="outlined" component="a" href={`https://${details.ilo}`} target="_blank" rel="noopener noreferrer" clickable />
                 )}
               </Stack>
             </Stack>
@@ -1252,103 +868,40 @@ function AssetDetailsModal({ assetId, open, onClose }) {
           {!loading && !error && details && (
             <Stack spacing={3} sx={{ flex: 1 }}>
               <Box>
-                <Typography variant="h6" gutterBottom>
-                  Aliases
-                </Typography>
+                <Typography variant="h6" gutterBottom>Aliases</Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {details.aliases?.length ? (
-                    details.aliases.map((alias) => <Chip key={alias} label={alias} variant="outlined" />)
-                  ) : (
-                    <Typography color="text.secondary" variant="body2">No aliases available.</Typography>
-                  )}
+                  {details.aliases?.length ? details.aliases.map((alias) => <Chip key={alias} label={alias} variant="outlined" />) : <Typography color="text.secondary" variant="body2">No aliases available.</Typography>}
                 </Stack>
               </Box>
 
               <Divider />
 
               <Box sx={{ width: "100%" }}>
-                <Tabs 
-                  value={tabValue} 
-                  onChange={(_, newValue) => setTabValue(newValue)} 
-                  variant="fullWidth"
-                  sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
-                >
+                <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} variant="fullWidth" sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
                   {availableTabs.map((label) => (
                     <Tab key={label} label={label} />
                   ))}
                 </Tabs>
 
-                {/* DYNAMIC TAB RENDERING BY LABEL */}
                 {availableTabs[tabValue] === "Machine" && (
                   <Stack spacing={3}>
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        Operating System
-                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Operating System</Typography>
                       <Grid container spacing={2}>
-                        {["Kernel", "OS Name", "OS Family", "Architecture", "Code Name", "CPE Name"].map((field) => {
-                          const mappedKey = field.toLowerCase().replace(" ", "_");
-                          return (
-                            <Grid item xs={12} sm={6} md={4} key={field}>
-                              <DetailRow label={field} value={details[mappedKey]} />
-                            </Grid>
-                          );
-                        })}
+                        {["Kernel", "OS Name", "OS Family", "Architecture", "Code Name", "CPE Name"].map((field) => (
+                          <Grid item xs={12} sm={6} md={4} key={field}>
+                            <DetailRow label={field} value={details[field.toLowerCase().replace(" ", "_")]} />
+                          </Grid>
+                        ))}
                       </Grid>
                     </Box>
-
                     <Divider variant="dashed" />
-
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        Hardware Vendor Profile
-                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Hardware Vendor Profile</Typography>
                       <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
-                        <Box sx={{ minWidth: 180, flex: 1 }}>
-                          <DetailRow label="Vendor" value={details.vendor} />
-                        </Box>
-                        <Box sx={{ minWidth: 180, flex: 1 }}>
-                          <DetailRow label="Product Name" value={details.product_name} />
-                        </Box>
+                        <Box sx={{ minWidth: 180, flex: 1 }}><DetailRow label="Vendor" value={details.vendor} /></Box>
+                        <Box sx={{ minWidth: 180, flex: 1 }}><DetailRow label="Product Name" value={details.product_name} /></Box>
                       </Stack>
-                    </Box>
-
-                    <Divider variant="dashed" />
-
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        Registered Users
-                      </Typography>
-                      {details.user_info?.length ? (
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Username</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Login Timestamp</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {details.user_info.map((user, idx) => (
-                                <TableRow key={`${user.username || "user"}-${idx}`} hover>
-                                  <TableCell sx={{ fontFamily: "monospace" }}>{user.username || "-"}</TableCell>
-                                  <TableCell>
-                                    {user.last_login ? (
-                                      user.last_login
-                                    ) : (
-                                      <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>
-                                        Never logged in / Null record
-                                      </Typography>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Typography color="text.secondary" variant="body2">No registered active workspace user logs metadata found.</Typography>
-                      )}
                     </Box>
                   </Stack>
                 )}
@@ -1356,36 +909,18 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                 {availableTabs[tabValue] === "Network" && (
                   <Stack spacing={3}>
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        Network Neighbours
-                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Network Neighbours</Typography>
                       <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {details.neighbour_ports?.length ? (
-                          details.neighbour_ports.map((item, index) => (
-                            <Chip
-                              key={`${item?.network_device || "device"}-${item?.local_port || "local"}-${item?.neighbour_port || index}`}
-                              label={`${item?.network_device || "Unknown device"} · ${item?.local_port || "?"} → ${item?.neighbour_port || "?"}`}
-                              variant="outlined"
-                            />
-                          ))
-                        ) : (
-                          <Typography color="text.secondary" variant="body2">No network neighbour discovery records available.</Typography>
-                        )}
+                        {details.neighbour_ports?.length ? details.neighbour_ports.map((item, index) => (
+                          <Chip key={`${item?.network_device || "device"}-${index}`} label={`${item?.network_device || "Unknown"} · ${item?.local_port || "?"} → ${item?.neighbour_port || "?"}`} variant="outlined" />
+                        )) : <Typography color="text.secondary" variant="body2">No network neighbour records available.</Typography>}
                       </Stack>
                     </Box>
-
                     <Divider variant="dashed" />
-
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                        IP Addresses
-                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>IP Addresses</Typography>
                       <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {details.ip_addresses?.length ? (
-                          details.ip_addresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />)
-                        ) : (
-                          <Typography color="text.secondary" variant="body2">No active IP assignments bind profiles.</Typography>
-                        )}
+                        {details.ip_addresses?.length ? details.ip_addresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />) : <Typography color="text.secondary" variant="body2">No active IP assignments.</Typography>}
                       </Stack>
                     </Box>
                   </Stack>
@@ -1395,168 +930,64 @@ function AssetDetailsModal({ assetId, open, onClose }) {
                   <Box>
                     <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Software Dependencies</Typography>
-                      <TextField
-                        size="small"
-                        label="Filter software list"
-                        value={softwareFilter}
-                        onChange={(e) => setSoftwareFilter(e.target.value)}
-                        sx={{ minWidth: { xs: "100%", sm: 260 } }}
-                      />
+                      <TextField size="small" label="Filter software list" value={softwareFilter} onChange={(e) => setSoftwareFilter(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 260 } }} />
                     </Stack>
                     {filteredSoftware.length ? (
                       <List dense sx={{ maxHeight: 300, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                        {filteredSoftware.map((item, index) => {
-                          const uniqueSwKey = item?.sw_name && item?.sw_version 
-                            ? `${item.sw_name}-${item.sw_version}` 
-                            : `sw-${index}`;
-                          return (
-                            <ListItem key={uniqueSwKey} divider>
-                              <ListItemText
-                                primary={`${item?.sw_name || "-"} ${item?.sw_version ? `(${item.sw_version})` : ""}`.trim()}
-                              />
-                            </ListItem>
-                          );
-                        })}
+                        {filteredSoftware.map((item, index) => (
+                          <ListItem key={item?.sw_name ? `${item.sw_name}-${index}` : index} divider>
+                            <ListItemText primary={`${item?.sw_name || "-"} ${item?.sw_version ? `(${item.sw_version})` : ""}`.trim()} />
+                          </ListItem>
+                        ))}
                       </List>
-                    ) : (
-                      <Typography color="text.secondary" variant="body2">
-                        {details.software?.length ? "No software matching filters found." : "No explicit packages monitored."}
-                      </Typography>
-                    )}
+                    ) : <Typography color="text.secondary" variant="body2">No software matching filters found.</Typography>}
                   </Box>
                 )}
 
                 {availableTabs[tabValue] === "Mounts" && (
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
-                      Storage Mount Points
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                      Click any mount source to view detailed mount options and properties.
-                    </Typography>
-
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Storage Mount Points</Typography>
                     {details.mounts?.length ? (
                       <List dense sx={{ maxHeight: 320, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                        {details.mounts.map((mount, index) => {
-                          const mountKey = mount.id || mount.mount_source || `mount-${index}`;
-                          return (
-                            <ListItem key={mountKey} disablePadding divider>
-                              <ListItemButton onClick={() => setSelectedMount(mount)}>
-                                <ListItemIcon sx={{ minWidth: 36 }}>
-                                  <StorageIcon fontSize="small" color="primary" />
-                                </ListItemIcon>
-                                <ListItemText
-                                  primary={mount.mount_source || "Unknown Source"}
-                                  primaryTypographyProps={{
-                                    fontFamily: "monospace",
-                                    fontWeight: 600,
-                                    fontSize: "0.9rem",
-                                  }}
-                                  secondary={
-                                    mount.mount_path
-                                      ? `Mounted on ${mount.mount_path}${mount.mount_type ? ` (${mount.mount_type})` : ""}`
-                                      : undefined
-                                  }
-                                />
-                              </ListItemButton>
-                            </ListItem>
-                          );
-                        })}
+                        {details.mounts.map((mount, index) => (
+                          <ListItem key={mount.id || index} disablePadding divider>
+                            <ListItemButton onClick={() => setSelectedMount(mount)}>
+                              <ListItemIcon sx={{ minWidth: 36 }}><StorageIcon fontSize="small" color="primary" /></ListItemIcon>
+                              <ListItemText primary={mount.mount_source || "Unknown Source"} secondary={mount.mount_path ? `Mounted on ${mount.mount_path}` : undefined} />
+                            </ListItemButton>
+                          </ListItem>
+                        ))}
                       </List>
-                    ) : (
-                      <Typography color="text.secondary" variant="body2">
-                        No mount point details available.
-                      </Typography>
-                    )}
+                    ) : <Typography color="text.secondary" variant="body2">No mount point details available.</Typography>}
                   </Box>
                 )}
 
                 {availableTabs[tabValue] === "Agent Status" && (
                   <Stack spacing={3}>
-                    {/* Section 1: Info Agents Status */}
                     <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                        Info Agents Status
-                      </Typography>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>Info Agents Status</Typography>
                       {details.agents?.length ? (
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
-                          <Table size="small" stickyHeader aria-label="Info agents status list">
+                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220 }}>
+                          <Table size="small" stickyHeader>
                             <TableHead>
                               <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Name</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Agent Status</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Update</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Agent Name</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
+                                <TableCell sx={{ fontWeight: 600 }}>Last Update</TableCell>
                               </TableRow>
                             </TableHead>
                             <TableBody>
                               {details.agents.map((agent, index) => (
-                                <TableRow key={`${agent.agent_name || "agent"}-${index}`} hover>
-                                  <TableCell sx={{ fontWeight: 500 }}>{agent.agent_name || "-"}</TableCell>
+                                <TableRow key={index} hover>
+                                  <TableCell>{agent.agent_name || "-"}</TableCell>
                                   <TableCell>{agent.agent_status || "-"}</TableCell>
-                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                                    {agent.agent_last || "-"}
-                                  </TableCell>
+                                  <TableCell>{agent.agent_last || "-"}</TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
                           </Table>
                         </TableContainer>
-                      ) : (
-                        <Typography color="text.secondary" variant="body2">
-                          No agent status information available.
-                        </Typography>
-                      )}
-                    </Box>
-
-                    <Divider variant="dashed" />
-
-                    {/* Section 2: Monitoring Status */}
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
-                        Monitoring Status
-                      </Typography>
-                      {details.monitoring?.length ? (
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 220, overflow: "auto" }}>
-                          <Table size="small" stickyHeader aria-label="Monitoring status list">
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Name</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor Status</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Monitor URL</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {details.monitoring.map((item, index) => (
-                                <TableRow key={`${item.monitor_name || "monitor"}-${index}`} hover>
-                                  <TableCell sx={{ fontWeight: 500 }}>{item.monitor_name || "-"}</TableCell>
-                                  <TableCell>{item.monitor_status || "-"}</TableCell>
-                                  <TableCell sx={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                                    {item.monitor_url ? (
-                                      <Chip 
-                                        label={item.monitor_url} 
-                                        size="small" 
-                                        color="primary" 
-                                        variant="outlined" 
-                                        component="a" 
-                                        href={item.monitor_url.startsWith("http") ? item.monitor_url : `https://${item.monitor_url}`} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer" 
-                                        clickable 
-                                      />
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : (
-                        <Typography color="text.secondary" variant="body2">
-                          No monitoring status information available.
-                        </Typography>
-                      )}
+                      ) : <Typography color="text.secondary" variant="body2">No agent status information available.</Typography>}
                     </Box>
                   </Stack>
                 )}
@@ -1566,17 +997,8 @@ function AssetDetailsModal({ assetId, open, onClose }) {
         </DialogContent>
       </Dialog>
 
-      {/* SUB-DIALOG: MOUNT DETAILS POPUP */}
-      <Dialog 
-        open={Boolean(selectedMount)} 
-        onClose={() => setSelectedMount(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}>
-          <StorageIcon color="primary" />
-          Mount Point Details
-        </DialogTitle>
+      <Dialog open={Boolean(selectedMount)} onClose={() => setSelectedMount(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}><StorageIcon color="primary" /> Mount Point Details</DialogTitle>
         <DialogContent dividers>
           {selectedMount && (
             <Stack spacing={2}>
@@ -1588,9 +1010,7 @@ function AssetDetailsModal({ assetId, open, onClose }) {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setSelectedMount(null)} variant="contained" size="small">
-            Close
-          </Button>
+          <Button onClick={() => setSelectedMount(null)} variant="contained" size="small">Close</Button>
         </DialogActions>
       </Dialog>
     </>
@@ -1602,357 +1022,15 @@ AssetDetailsModal.propTypes = {
   open: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
 };
-// Common Action Button Styling Configuration
-const actionButtonSx = {
-  borderRadius: 2,
-  px: 2.5,
-  py: 0.8,
-  fontWeight: 600,
-  letterSpacing: "0.2px",
-  textTransform: "none",
-  whiteSpace: "nowrap",
-  borderColor: "action.disabledBackground",
-  color: "text.primary",
-  bgcolor: "action.hover",
-  transition: "all 0.2s ease-in-out",
-  "&:hover": {
-    bgcolor: "primary.main",
-    color: "primary.contrastText",
-    borderColor: "primary.main",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-    transform: "translateY(-1px)",
-  },
-};
 
 // ==========================================
-// COMPONENT: Admin User & Role Manager Page
+// COMPONENT: Impersonation Asset View
 // ==========================================
-function AdminPage() {
-  const [targetType, setTargetType] = useState("user"); // 'user' or 'group'
-  const [roles, setRoles] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [groups, setGroups] = useState([]);
-  const [selectedTarget, setSelectedTarget] = useState(null);
-  const [assignedRoleIds, setAssignedRoleIds] = useState([]);
-  const [targetFilter, setTargetFilter] = useState("");
-  
-  const [loading, setLoading] = useState(false);
-  const [rolesLoading, setRolesLoading] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState(null);
+function ImpersonationView({ onSelectAsset }) {
+  const [owners, setOwners] = useState([]);
+  const [selectedOwner, setSelectedOwner] = useState(null);
+  const [ownersLoading, setOwnersLoading] = useState(false);
 
-  // Fetch Roles List from Endpoint
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchRoles = async () => {
-      setRolesLoading(true);
-      try {
-        const response = await api.get("/api/v1/security/roles", { signal: controller.signal });
-        setRoles(response.data?.items || response.data?.roles || []);
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error("Error loading security roles:", err);
-      } finally {
-        if (!controller.signal.aborted) {
-          setRolesLoading(false);
-        }
-      }
-    };
-
-    fetchRoles();
-    return () => controller.abort();
-  }, []);
-
-  // Fetch Target List (Users / Groups)
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchTargets = async () => {
-      setLoading(true);
-      setError(null);
-      setSelectedTarget(null);
-      setAssignedRoleIds([]);
-      setTargetFilter("");
-      try {
-        const endpoint = targetType === "user" ? "/api/v1/security/users" : "/api/v1/security/groups";
-        const response = await api.get(endpoint, { signal: controller.signal });
-        if (targetType === "user") {
-          setUsers(response.data?.items || response.data || []);
-        } else {
-          setGroups(response.data?.items || response.data || []);
-        }
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error(`Error loading ${targetType}s:`, err);
-        setError(`Failed to fetch ${targetType}s list.`);
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchTargets();
-    return () => controller.abort();
-  }, [targetType]);
-
-  // Fetch Assigned Roles for Selected Target
-  useEffect(() => {
-    if (!selectedTarget) return;
-
-    const controller = new AbortController();
-    const fetchAssignedRoles = async () => {
-      setActionLoading(true);
-      try {
-        const endpoint = targetType === "user" 
-          ? `/api/v1/security/users/${selectedTarget.id}/roles` 
-          : `/api/v1/security/groups/${selectedTarget.id}/roles`;
-        const response = await api.get(endpoint, { signal: controller.signal });
-        const assigned = response.data?.items || response.data?.roles || response.data || [];
-        setAssignedRoleIds(assigned.map((r) => r.id));
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error("Error fetching assigned roles:", err);
-      } finally {
-        if (!controller.signal.aborted) {
-          setActionLoading(false);
-        }
-      }
-    };
-
-    fetchAssignedRoles();
-    return () => controller.abort();
-  }, [selectedTarget, targetType]);
-
-  // Toggle Role Assignment (Add or Remove)
-  const handleRoleToggle = async (roleId, isAssigned) => {
-    if (!selectedTarget) return;
-    setActionLoading(true);
-
-    try {
-      const endpoint = targetType === "user"
-        ? `/api/v1/security/users/${selectedTarget.id}/roles/${roleId}`
-        : `/api/v1/security/groups/${selectedTarget.id}/roles/${roleId}`;
-
-      if (isAssigned) {
-        // Remove Role
-        await api.delete(endpoint);
-        setAssignedRoleIds((prev) => prev.filter((id) => id !== roleId));
-      } else {
-        // Add Role
-        await api.post(endpoint);
-        setAssignedRoleIds((prev) => [...prev, roleId]);
-      }
-    } catch (err) {
-      console.error("Error updating role assignment:", err);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const targetList = useMemo(() => {
-    const rawList = targetType === "user" ? users : groups;
-    const query = targetFilter.trim().toLowerCase();
-    if (!query) return rawList;
-
-    return rawList.filter((item) => {
-      const name = (item.name || item.username || item.label || "").toLowerCase();
-      const subLabel = (item.email || item.description || "").toLowerCase();
-      const idStr = String(item.id || "");
-      return name.includes(query) || subLabel.includes(query) || idStr.includes(query);
-    });
-  }, [targetType, users, groups, targetFilter]);
-
-  return (
-    <Box>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          User & Permission Administration
-        </Typography>
-        <ToggleButtonGroup
-          size="small"
-          value={targetType}
-          exclusive
-          onChange={(_, val) => val && setTargetType(val)}
-        >
-          <ToggleButton value="user">Users</ToggleButton>
-          <ToggleButton value="group">Groups</ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
-
-      <Grid container spacing={3}>
-        {/* Left Panel: Target Selection */}
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1.5 }}>
-              Select {targetType === "user" ? "User" : "Group"}
-            </Typography>
-
-            <TextField
-              size="small"
-              placeholder={`Filter ${targetType === "user" ? "users" : "groups"}...`}
-              value={targetFilter}
-              onChange={(e) => setTargetFilter(e.target.value)}
-              sx={{ mb: 2 }}
-            />
-
-            {loading && <LinearProgress sx={{ mb: 2 }} />}
-            {error && <Typography color="error" variant="body2">{error}</Typography>}
-
-            {!loading && !error && (
-              <List dense sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                {targetList.length > 0 ? (
-                  targetList.map((item) => {
-                    const isSelected = selectedTarget?.id === item.id;
-                    const label = item.name || item.username || item.label || `ID: ${item.id}`;
-                    const subLabel = item.email || item.description || "";
-
-                    return (
-                      <ListItem key={item.id} disablePadding divider>
-                        <ListItemButton 
-                          selected={isSelected} 
-                          onClick={() => setSelectedTarget(item)}
-                        >
-                          <ListItemText 
-                            primary={label} 
-                            secondary={subLabel || undefined} 
-                            primaryTypographyProps={{ fontWeight: isSelected ? 700 : 400 }}
-                          />
-                        </ListItemButton>
-                      </ListItem>
-                    );
-                  })
-                ) : (
-                  <Typography color="text.secondary" variant="body2" align="center" sx={{ p: 2 }}>
-                    No {targetType}s match filter.
-                  </Typography>
-                )}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Right Panel: Role Assignment Matrix */}
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-              Assigned Roles
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {selectedTarget 
-                ? `Managing roles for ${targetType}: ${selectedTarget.name || selectedTarget.username || selectedTarget.id}`
-                : `Select a ${targetType} on the left to assign or revoke permissions.`}
-            </Typography>
-
-            {actionLoading && <LinearProgress sx={{ mb: 2 }} />}
-
-            {!selectedTarget ? (
-              <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Typography color="text.secondary">No selection made.</Typography>
-              </Box>
-            ) : rolesLoading ? (
-              <LinearProgress />
-            ) : (
-              <List sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                {roles.map((role) => {
-                  const isAssigned = assignedRoleIds.includes(role.id);
-                  return (
-                    <ListItem key={role.id} divider>
-                      <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={isAssigned}
-                            disabled={actionLoading}
-                            onChange={() => handleRoleToggle(role.id, isAssigned)}
-                          />
-                        }
-                        label={
-                          <Box sx={{ ml: 1 }}>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {role.name || role.label}
-                            </Typography>
-                            {role.description && (
-                              <Typography variant="caption" color="text.secondary">
-                                {role.description}
-                              </Typography>
-                            )}
-                          </Box>
-                        }
-                        sx={{ width: "100%", m: 0 }}
-                      />
-                    </ListItem>
-                  );
-                })}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-}
-
-// ==========================================
-// COMPONENT: Main App Layout & View Router
-// ==========================================
-export default function App({ mode, onToggleColorMode }) {
-  const [currentView, setCurrentView] = useState("summary");
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedAssetId, setSelectedAssetId] = useState(null);
-  const [selectedVolumeId, setSelectedVolumeId] = useState(null);
-
-  // ------------------------------------------
-  // PERMISSIONS / SECURITY STATE & EFFECTS
-  // ------------------------------------------
-  const [allowedPages, setAllowedPages] = useState([]);
-  const [permissionsLoading, setPermissionsLoading] = useState(true);
-  const [permissionsError, setPermissionsError] = useState(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchPermissions = async () => {
-      setPermissionsLoading(true);
-      setPermissionsError(null);
-      try {
-        const response = await api.get("/api/v1/security/permissions", {
-          signal: controller.signal,
-        });
-        const pages = response.data?.pages || [];
-        setAllowedPages(pages);
-
-        // Redirect to first allowed page if current view is prohibited
-        if (pages.length > 0 && !pages.includes(currentView)) {
-          setCurrentView(pages[0]);
-        }
-      } catch (err) {
-        if (axios.isCancel(err) || err.name === "CanceledError") return;
-        console.error("Error fetching permissions:", err);
-        setPermissionsError("Failed to load user permissions.");
-      } finally {
-        if (!controller.signal.aborted) {
-          setPermissionsLoading(false);
-        }
-      }
-    };
-
-    fetchPermissions();
-    return () => controller.abort();
-  }, []);
-
-  // Filter navigation items based on backend permissions
-  const visibleNavItems = useMemo(() => {
-    return NAV_ITEMS.filter((item) => allowedPages.includes(item.key));
-  }, [allowedPages]);
-
-  const handleViewChange = (targetView) => {
-    setSelectedAssetId(null);
-    setSelectedVolumeId(null);
-    setCurrentView(targetView);
-  };
-
-  // ------------------------------------------
-  // ASSETS VIEW STATE & EFFECTS
-  // ------------------------------------------
   const [assetRows, setAssetRows] = useState([]);
   const [assetLoading, setAssetLoading] = useState(false);
   const [assetExporting, setAssetExporting] = useState(false);
@@ -1963,6 +1041,27 @@ export default function App({ mode, onToggleColorMode }) {
   const [debouncedAssetColumnFilters, setDebouncedAssetColumnFilters] = useState({});
   const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
   const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchOwners = async () => {
+      setOwnersLoading(true);
+      try {
+        const response = await api.get("/api/v1/assets/owners", { signal: controller.signal });
+        setOwners(response.data?.items || response.data || []);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching owners list:", err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setOwnersLoading(false);
+        }
+      }
+    };
+
+    fetchOwners();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
@@ -2009,14 +1108,549 @@ export default function App({ mode, onToggleColorMode }) {
           const cfg = getPowerStateConfig(params.value);
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
-              <Box 
-                sx={{ 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: "50%", 
-                  bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` 
-                }} 
-              />
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` }} />
+              <Typography variant="body2">{cfg.label}</Typography>
+            </Box>
+          );
+        }
+      },
+      { field: "ips", headerName: "IPs", flex: 1.3, renderHeader: createHeaderWithFilter("ips", "IPs", assetColumnFilters, handleColumnFilterChange) },
+      { field: "alias", headerName: "Alias", flex: 1.2, renderHeader: createHeaderWithFilter("alias", "Alias", assetColumnFilters, handleColumnFilterChange) },
+    ],
+    [assetColumnFilters]
+  );
+
+  useEffect(() => {
+    if (!selectedOwner?.owner_id) {
+      setAssetRows([]);
+      setAssetRowCount(0);
+      return;
+    }
+
+    const controller = new AbortController();
+    const loadOwnerAssets = async () => {
+      setAssetLoading(true);
+      try {
+        const sortBy = assetSortModel[0]?.field || "id";
+        const sortDir = assetSortModel[0]?.sort || "asc";
+
+        const filterParams = {};
+        Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
+          if (val && val.trim() !== "") {
+            filterParams[`${field}_filter`] = val.trim();
+          }
+        });
+
+        const response = await api.get(`/api/v1/assets/owners/${selectedOwner.owner_id}`, {
+          signal: controller.signal,
+          params: {
+            page: assetPaginationModel.page + 1,
+            page_size: assetPaginationModel.pageSize,
+            sort_by: sortBy,
+            sort_dir: sortDir,
+            search: debouncedAssetSearch || undefined,
+            ...filterParams,
+          },
+        });
+
+        setAssetRows(response.data?.items || []);
+        setAssetRowCount(response.data?.total || 0);
+      } catch (error) {
+        if (axios.isCancel(error) || error.name === "CanceledError") return;
+        console.error("Error loading owner assets list:", error);
+      } finally {
+        if (!controller.signal.aborted) {
+          setAssetLoading(false);
+        }
+      }
+    };
+
+    loadOwnerAssets();
+    return () => controller.abort();
+  }, [selectedOwner, assetPaginationModel, assetSortModel, debouncedAssetSearch, debouncedAssetColumnFilters]);
+
+  const handleExportAssetsExcel = async () => {
+    if (!selectedOwner?.owner_id) return;
+
+    setAssetExporting(true);
+    try {
+      const sortBy = assetSortModel[0]?.field || "id";
+      const sortDir = assetSortModel[0]?.sort || "asc";
+
+      const filterParams = {};
+      Object.entries(debouncedAssetColumnFilters).forEach(([field, val]) => {
+        if (val && val.trim() !== "") {
+          filterParams[`${field}_filter`] = val.trim();
+        }
+      });
+
+      const response = await api.get(`/api/v1/assets/owners/${selectedOwner.owner_id}`, {
+        params: {
+          page: 1,
+          page_size: 100000,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          search: debouncedAssetSearch || undefined,
+          ...filterParams,
+        },
+      });
+
+      const fullItems = response.data?.items || [];
+      if (fullItems.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(fullItems);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Impersonated_Assets");
+      XLSX.writeFile(workbook, `impersonated_assets_${selectedOwner.owner_name || selectedOwner.owner_id}.xlsx`);
+    } catch (error) {
+      console.error("Error exporting impersonated assets set:", error);
+    } finally {
+      setAssetExporting(false);
+    }
+  };
+
+  const hasActiveAssetFilters = useMemo(() => {
+    if (assetSearch.trim() !== "") return true;
+    return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
+  }, [assetSearch, assetColumnFilters]);
+
+  return (
+    <Box>
+      <Paper sx={{ p: 2, mb: 2, display: "flex", flexWrap: "wrap", gap: 2, alignItems: "center" }}>
+        <Autocomplete
+          size="small"
+          options={owners}
+          loading={ownersLoading}
+          getOptionLabel={(option) => option.owner_name || String(option.owner_id || "")}
+          isOptionEqualToValue={(option, value) => option.owner_id === value.owner_id}
+          value={selectedOwner}
+          onChange={(_, newValue) => {
+            setSelectedOwner(newValue);
+            setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+          }}
+          sx={{ minWidth: 280, flex: 1 }}
+          renderInput={(params) => (
+            <TextField {...params} label="Select Asset Owner (Impersonate)" placeholder="Choose owner..." />
+          )}
+        />
+
+        <TextField
+          size="small"
+          label="Search Assets"
+          value={assetSearch}
+          disabled={!selectedOwner}
+          onChange={(e) => {
+            setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+            setAssetSearch(e.target.value);
+          }}
+          sx={{ flex: 1.5, minWidth: 220 }}
+        />
+
+        <Button
+          variant="outlined"
+          startIcon={<FileDownloadOutlinedIcon />}
+          onClick={handleExportAssetsExcel}
+          disabled={!selectedOwner || assetExporting || assetRowCount === 0}
+          sx={actionButtonSx}
+        >
+          {assetExporting ? "Exporting..." : "Export Excel"}
+        </Button>
+
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<FilterAltOffOutlinedIcon />}
+          onClick={handleClearAssetFilters}
+          disabled={!selectedOwner || !hasActiveAssetFilters}
+          sx={{
+            ...actionButtonSx,
+            "&:hover": {
+              bgcolor: "error.main",
+              color: "error.contrastText",
+              borderColor: "error.main",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              transform: "translateY(-1px)",
+            },
+          }}
+        >
+          Clear Filters
+        </Button>
+      </Paper>
+
+      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+        <DataGrid
+          columnHeaderHeight={70}
+          rows={assetRows}
+          columns={assetColumns}
+          loading={assetLoading}
+          rowCount={assetRowCount}
+          pagination
+          paginationMode="server"
+          sortingMode="server"
+          paginationModel={assetPaginationModel}
+          onPaginationModelChange={setAssetPaginationModel}
+          sortModel={assetSortModel}
+          onSortModelChange={setAssetSortModel}
+          pageSizeOptions={[25, 50, 100]}
+          disableRowSelectionOnClick
+          onRowClick={(params) => onSelectAsset(params.row.id)}
+          sx={{
+            bgcolor: "background.paper",
+            cursor: selectedOwner ? "pointer" : "default",
+            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+          }}
+        />
+      </Paper>
+    </Box>
+  );
+}
+
+ImpersonationView.propTypes = {
+  onSelectAsset: PropTypes.func.isRequired,
+};
+
+// ==========================================
+// COMPONENT: Admin User & Role Manager Page
+// ==========================================
+function AdminPage() {
+  const [targetType, setTargetType] = useState("user");
+  const [roles, setRoles] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState(null);
+  const [assignedRoleIds, setAssignedRoleIds] = useState([]);
+  const [targetFilter, setTargetFilter] = useState("");
+  
+  const [loading, setLoading] = useState(false);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchRoles = async () => {
+      setRolesLoading(true);
+      try {
+        const response = await api.get("/api/v1/security/roles", { signal: controller.signal });
+        setRoles(response.data?.items || response.data?.roles || []);
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error loading security roles:", err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setRolesLoading(false);
+        }
+      }
+    };
+
+    fetchRoles();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const fetchTargets = async () => {
+      setLoading(true);
+      setError(null);
+      setSelectedTarget(null);
+      setAssignedRoleIds([]);
+      setTargetFilter("");
+      try {
+        const endpoint = targetType === "user" ? "/api/v1/security/users" : "/api/v1/security/groups";
+        const response = await api.get(endpoint, { signal: controller.signal });
+        if (targetType === "user") {
+          setUsers(response.data?.items || response.data || []);
+        } else {
+          setGroups(response.data?.items || response.data || []);
+        }
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error(`Error loading ${targetType}s:`, err);
+        setError(`Failed to fetch ${targetType}s list.`);
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchTargets();
+    return () => controller.abort();
+  }, [targetType]);
+
+  useEffect(() => {
+    if (!selectedTarget) return;
+
+    const controller = new AbortController();
+    const fetchAssignedRoles = async () => {
+      setActionLoading(true);
+      try {
+        const endpoint = targetType === "user" 
+          ? `/api/v1/security/users/${selectedTarget.id}/roles` 
+          : `/api/v1/security/groups/${selectedTarget.id}/roles`;
+        const response = await api.get(endpoint, { signal: controller.signal });
+        const assigned = response.data?.items || response.data?.roles || response.data || [];
+        setAssignedRoleIds(assigned.map((r) => r.id));
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching assigned roles:", err);
+      } finally {
+        if (!controller.signal.aborted) {
+          setActionLoading(false);
+        }
+      }
+    };
+
+    fetchAssignedRoles();
+    return () => controller.abort();
+  }, [selectedTarget, targetType]);
+
+  const handleRoleToggle = async (roleId, isAssigned) => {
+    if (!selectedTarget) return;
+    setActionLoading(true);
+
+    try {
+      const endpoint = targetType === "user"
+        ? `/api/v1/security/users/${selectedTarget.id}/roles/${roleId}`
+        : `/api/v1/security/groups/${selectedTarget.id}/roles/${roleId}`;
+
+      if (isAssigned) {
+        await api.delete(endpoint);
+        setAssignedRoleIds((prev) => prev.filter((id) => id !== roleId));
+      } else {
+        await api.post(endpoint);
+        setAssignedRoleIds((prev) => [...prev, roleId]);
+      }
+    } catch (err) {
+      console.error("Error updating role assignment:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const targetList = useMemo(() => {
+    const rawList = targetType === "user" ? users : groups;
+    const query = targetFilter.trim().toLowerCase();
+    if (!query) return rawList;
+
+    return rawList.filter((item) => {
+      const name = (item.name || item.username || item.label || "").toLowerCase();
+      const subLabel = (item.email || item.description || "").toLowerCase();
+      const idStr = String(item.id || "");
+      return name.includes(query) || subLabel.includes(query) || idStr.includes(query);
+    });
+  }, [targetType, users, groups, targetFilter]);
+
+  return (
+    <Box>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Typography variant="h5" sx={{ fontWeight: 600 }}>
+          User & Permission Administration
+        </Typography>
+        <ToggleButtonGroup size="small" value={targetType} exclusive onChange={(_, val) => val && setTargetType(val)}>
+          <ToggleButton value="user">Users</ToggleButton>
+          <ToggleButton value="group">Groups</ToggleButton>
+        </ToggleButtonGroup>
+      </Stack>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={5}>
+          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1.5 }}>
+              Select {targetType === "user" ? "User" : "Group"}
+            </Typography>
+
+            <TextField
+              size="small"
+              placeholder={`Filter ${targetType === "user" ? "users" : "groups"}...`}
+              value={targetFilter}
+              onChange={(e) => setTargetFilter(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+
+            {loading && <LinearProgress sx={{ mb: 2 }} />}
+            {error && <Typography color="error" variant="body2">{error}</Typography>}
+
+            {!loading && !error && (
+              <List dense sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                {targetList.length > 0 ? (
+                  targetList.map((item) => {
+                    const isSelected = selectedTarget?.id === item.id;
+                    const label = item.name || item.username || item.label || `ID: ${item.id}`;
+                    const subLabel = item.email || item.description || "";
+
+                    return (
+                      <ListItem key={item.id} disablePadding divider>
+                        <ListItemButton selected={isSelected} onClick={() => setSelectedTarget(item)}>
+                          <ListItemText primary={label} secondary={subLabel || undefined} primaryTypographyProps={{ fontWeight: isSelected ? 700 : 400 }} />
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })
+                ) : (
+                  <Typography color="text.secondary" variant="body2" align="center" sx={{ p: 2 }}>
+                    No {targetType}s match filter.
+                  </Typography>
+                )}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 2, height: 600, display: "flex", flexDirection: "column" }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+              Assigned Roles
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              {selectedTarget 
+                ? `Managing roles for ${targetType}: ${selectedTarget.name || selectedTarget.username || selectedTarget.id}`
+                : `Select a ${targetType} on the left to assign or revoke permissions.`}
+            </Typography>
+
+            {actionLoading && <LinearProgress sx={{ mb: 2 }} />}
+
+            {!selectedTarget ? (
+              <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Typography color="text.secondary">No selection made.</Typography>
+              </Box>
+            ) : rolesLoading ? (
+              <LinearProgress />
+            ) : (
+              <List sx={{ flex: 1, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                {roles.map((role) => {
+                  const isAssigned = assignedRoleIds.includes(role.id);
+                  return (
+                    <ListItem key={role.id} divider>
+                      <FormControlLabel
+                        control={<Checkbox checked={isAssigned} disabled={actionLoading} onChange={() => handleRoleToggle(role.id, isAssigned)} />}
+                        label={
+                          <Box sx={{ ml: 1 }}>
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>{role.name || role.label}</Typography>
+                            {role.description && <Typography variant="caption" color="text.secondary">{role.description}</Typography>}
+                          </Box>
+                        }
+                        sx={{ width: "100%", m: 0 }}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+}
+
+// ==========================================
+// COMPONENT: Main App Layout & View Router
+// ==========================================
+export default function App({ mode, onToggleColorMode }) {
+  const [currentView, setCurrentView] = useState("summary");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState(null);
+  const [selectedVolumeId, setSelectedVolumeId] = useState(null);
+
+  const [allowedPages, setAllowedPages] = useState([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+  const [permissionsError, setPermissionsError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchPermissions = async () => {
+      setPermissionsLoading(true);
+      setPermissionsError(null);
+      try {
+        const response = await api.get("/api/v1/security/permissions", {
+          signal: controller.signal,
+        });
+        const pages = response.data?.pages || [];
+        setAllowedPages(pages);
+
+        if (pages.length > 0 && !pages.includes(currentView)) {
+          setCurrentView(pages[0]);
+        }
+      } catch (err) {
+        if (axios.isCancel(err) || err.name === "CanceledError") return;
+        console.error("Error fetching permissions:", err);
+        setPermissionsError("Failed to load user permissions.");
+      } finally {
+        if (!controller.signal.aborted) {
+          setPermissionsLoading(false);
+        }
+      }
+    };
+
+    fetchPermissions();
+    return () => controller.abort();
+  }, []);
+
+  const visibleNavItems = useMemo(() => {
+    return NAV_ITEMS.filter((item) => allowedPages.includes(item.key));
+  }, [allowedPages]);
+
+  const handleViewChange = (targetView) => {
+    setSelectedAssetId(null);
+    setSelectedVolumeId(null);
+    setCurrentView(targetView);
+  };
+
+  // ASSETS VIEW STATE
+  const [assetRows, setAssetRows] = useState([]);
+  const [assetLoading, setAssetLoading] = useState(false);
+  const [assetExporting, setAssetExporting] = useState(false);
+  const [assetRowCount, setAssetRowCount] = useState(0);
+  const [assetSearch, setAssetSearch] = useState("");
+  const [debouncedAssetSearch, setDebouncedAssetSearch] = useState("");
+  const [assetColumnFilters, setAssetColumnFilters] = useState({});
+  const [debouncedAssetColumnFilters, setDebouncedAssetColumnFilters] = useState({});
+  const [assetPaginationModel, setAssetPaginationModel] = useState({ page: 0, pageSize: 50 });
+  const [assetSortModel, setAssetSortModel] = useState([{ field: "id", sort: "asc" }]);
+
+  useEffect(() => {
+    const delayHandler = setTimeout(() => setDebouncedAssetSearch(assetSearch), 400);
+    return () => clearTimeout(delayHandler);
+  }, [assetSearch]);
+
+  useEffect(() => {
+    const delayHandler = setTimeout(() => setDebouncedAssetColumnFilters(assetColumnFilters), 400);
+    return () => clearTimeout(delayHandler);
+  }, [assetColumnFilters]);
+
+  const handleColumnFilterChange = (field, value) => {
+    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+    setAssetColumnFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleClearAssetFilters = () => {
+    setAssetSearch("");
+    setAssetColumnFilters({});
+    setAssetPaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const assetColumns = useMemo(
+    () => [
+      { field: "id", headerName: "ID", flex: 0.8, renderHeader: createHeaderWithFilter("id", "ID", assetColumnFilters, handleColumnFilterChange) },
+      { field: "name", headerName: "Name", flex: 1.2, renderHeader: createHeaderWithFilter("name", "Name", assetColumnFilters, handleColumnFilterChange) },
+      { field: "tag", headerName: "Tag", flex: 1, renderHeader: createHeaderWithFilter("tag", "Tag", assetColumnFilters, handleColumnFilterChange) },
+      { field: "type", headerName: "Type", flex: 1, renderHeader: createHeaderWithFilter("type", "Type", assetColumnFilters, handleColumnFilterChange) },
+      { field: "owner", headerName: "Owner", flex: 1.1, renderHeader: createHeaderWithFilter("owner", "Owner", assetColumnFilters, handleColumnFilterChange) },
+      { field: "location", headerName: "Location", flex: 1.1, renderHeader: createHeaderWithFilter("location", "Location", assetColumnFilters, handleColumnFilterChange) },
+      { field: "os", headerName: "OS", flex: 1.1, renderHeader: createHeaderWithFilter("os", "OS", assetColumnFilters, handleColumnFilterChange) },
+      { field: "status", headerName: "Status", flex: 0.9, renderHeader: createHeaderWithFilter("status", "Status", assetColumnFilters, handleColumnFilterChange) },
+      { 
+        field: "power_state", 
+        headerName: "Power State", 
+        flex: 1.1,
+        renderHeader: createHeaderWithFilter("power_state", "Power State", assetColumnFilters, handleColumnFilterChange),
+        renderCell: (params) => {
+          const cfg = getPowerStateConfig(params.value);
+          return (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` }} />
               <Typography variant="body2">{cfg.label}</Typography>
             </Box>
           );
@@ -2116,9 +1750,7 @@ export default function App({ mode, onToggleColorMode }) {
     return Object.values(assetColumnFilters).some((val) => val && val.trim() !== "");
   }, [assetSearch, assetColumnFilters]);
 
-  // ------------------------------------------
-  // VOLUMES VIEW STATE & EFFECTS
-  // ------------------------------------------
+  // VOLUMES VIEW STATE
   const [volumeRows, setVolumeRows] = useState([]);
   const [volumeLoading, setVolumeLoading] = useState(false);
   const [volumeExporting, setVolumeExporting] = useState(false);
@@ -2136,18 +1768,13 @@ export default function App({ mode, onToggleColorMode }) {
   }, [volumeSearch]);
 
   useEffect(() => {
-    const delayHandler = setTimeout(() => {
-      setDebouncedVolumeColumnFilters(volumeColumnFilters);
-    }, 400);
+    const delayHandler = setTimeout(() => setDebouncedVolumeColumnFilters(volumeColumnFilters), 400);
     return () => clearTimeout(volumeColumnFilters);
   }, [volumeColumnFilters]);
 
   const handleVolumeColumnFilterChange = (field, value) => {
     setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
-    setVolumeColumnFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setVolumeColumnFilters((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleClearVolumeFilters = () => {
@@ -2254,9 +1881,7 @@ export default function App({ mode, onToggleColorMode }) {
     return Object.values(volumeColumnFilters).some((val) => val && val.trim() !== "");
   }, [volumeSearch, volumeColumnFilters]);
 
-  // ------------------------------------------
-  // ARCHIVED VIEW STATE & EFFECTS
-  // ------------------------------------------
+  // ARCHIVED VIEW STATE
   const [archivedRows, setArchivedRows] = useState([]);
   const [archivedLoading, setArchivedLoading] = useState(false);
   const [archivedExporting, setArchivedExporting] = useState(false);
@@ -2274,18 +1899,13 @@ export default function App({ mode, onToggleColorMode }) {
   }, [archivedSearch]);
 
   useEffect(() => {
-    const delayHandler = setTimeout(() => {
-      setDebouncedArchivedColumnFilters(archivedColumnFilters);
-    }, 400);
+    const delayHandler = setTimeout(() => setDebouncedArchivedColumnFilters(archivedColumnFilters), 400);
     return () => clearTimeout(archivedColumnFilters);
   }, [archivedColumnFilters]);
 
   const handleArchivedColumnFilterChange = (field, value) => {
     setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
-    setArchivedColumnFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setArchivedColumnFilters((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleClearArchivedFilters = () => {
@@ -2313,14 +1933,7 @@ export default function App({ mode, onToggleColorMode }) {
           const cfg = getPowerStateConfig(params.value);
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
-              <Box 
-                sx={{ 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: "50%", 
-                  bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` 
-                }} 
-              />
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` }} />
               <Typography variant="body2">{cfg.label}</Typography>
             </Box>
           );
@@ -2420,9 +2033,7 @@ export default function App({ mode, onToggleColorMode }) {
     return Object.values(archivedColumnFilters).some((val) => val && val.trim() !== "");
   }, [archivedSearch, archivedColumnFilters]);
 
-  // ------------------------------------------
-  // SOFTWARES VIEW STATE & EFFECTS
-  // ------------------------------------------
+  // SOFTWARES VIEW STATE
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
   const [softwareExporting, setSoftwareExporting] = useState(false);
@@ -2547,6 +2158,7 @@ export default function App({ mode, onToggleColorMode }) {
             {currentView === "assets" && "Asset Master"}
             {currentView === "volumes" && "Storage Volumes"}
             {currentView === "softwares" && "Softwares Inventory"}
+            {currentView === "impersonation" && "Impersonation View"}
             {currentView === "archived" && "Archived Assets"}
             {currentView === "admin" && "User Administration"}
           </Typography>
@@ -2613,7 +2225,6 @@ export default function App({ mode, onToggleColorMode }) {
           <>
             {currentView === "summary" && allowedPages.includes("summary") && (
               <Grid container spacing={3}>
-                {/* ROW 1 - Card 1: Operating Systems */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Operating Systems Distribution"
@@ -2623,7 +2234,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 1 - Card 2: Server Manufacturer / Vendor */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Vendor / Manufacturer Breakdown"
@@ -2633,7 +2243,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 2 - Card 3: Server Product Model */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Product Model Breakdown"
@@ -2643,7 +2252,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 2 - Card 4: Asset Types */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Asset Types Breakdown"
@@ -2653,7 +2261,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 3 - Card 5: VM Locations */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Virtual Machine Location Distribution"
@@ -2669,7 +2276,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 3 - Card 6: Bare Metal (BM) Locations */}
                 <Grid item xs={12} md={6}>
                   <StatCard
                     title="Bare Metal Location Distribution"
@@ -2686,7 +2292,6 @@ export default function App({ mode, onToggleColorMode }) {
                   />
                 </Grid>
 
-                {/* ROW 4 - Card 7: Monitoring Status */}
                 <Grid item xs={12} md={6}>
                   <MonitoringStatCard />
                 </Grid>
@@ -2833,78 +2438,6 @@ export default function App({ mode, onToggleColorMode }) {
               </>
             )}
 
-            {currentView === "archived" && allowedPages.includes("archived") && (
-              <>
-                <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Search Archived Assets"
-                    value={archivedSearch}
-                    onChange={(e) => {
-                      setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
-                      setArchivedSearch(e.target.value);
-                    }}
-                  />
-                  <Button
-                    variant="outlined"
-                    startIcon={<FileDownloadOutlinedIcon />}
-                    onClick={handleExportArchivedExcel}
-                    disabled={archivedExporting || archivedRowCount === 0}
-                    sx={actionButtonSx}
-                  >
-                    {archivedExporting ? "Exporting..." : "Export Excel"}
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<FilterAltOffOutlinedIcon />}
-                    onClick={handleClearArchivedFilters}
-                    disabled={!hasActiveArchivedFilters}
-                    sx={{
-                      ...actionButtonSx,
-                      "&:hover": {
-                        bgcolor: "error.main",
-                        color: "error.contrastText",
-                        borderColor: "error.main",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-                        transform: "translateY(-1px)",
-                      },
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                </Paper>
-
-                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-                  <DataGrid
-                    columnHeaderHeight={70}
-                    rows={archivedRows}
-                    columns={archivedColumns}
-                    loading={archivedLoading}
-                    rowCount={archivedRowCount}
-                    pagination
-                    paginationMode="server"
-                    sortingMode="server"
-                    paginationModel={archivedPaginationModel}
-                    onPaginationModelChange={setArchivedPaginationModel}
-                    sortModel={archivedSortModel}
-                    onSortModelChange={setArchivedSortModel}
-                    pageSizeOptions={[25, 50, 100]}
-                    disableRowSelectionOnClick
-                    onRowClick={(params) => setSelectedAssetId(params.row.id)}
-                    sx={{
-                      bgcolor: "background.paper",
-                      cursor: "pointer",
-                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-                    }}
-                  />
-                </Paper>
-              </>
-            )}
-            {currentView === "impersonation" && allowedPages.includes("impersonation") && (
-                <ImpersonationView onSelectAsset={(assetId) => setSelectedAssetId(assetId)} />
-            )}
             {currentView === "softwares" && allowedPages.includes("softwares") && (
               <>
                 <Paper sx={{ p: 2, mb: 2 }}>
@@ -2978,6 +2511,80 @@ export default function App({ mode, onToggleColorMode }) {
                     disableRowSelectionOnClick
                     getRowId={(row) => row.id || `${row.asset}-${row.name}`}
                     onRowClick={(params) => setSelectedAssetId(params.row.asset)}
+                    sx={{
+                      bgcolor: "background.paper",
+                      cursor: "pointer",
+                      '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+                    }}
+                  />
+                </Paper>
+              </>
+            )}
+
+            {currentView === "impersonation" && allowedPages.includes("impersonation") && (
+              <ImpersonationView onSelectAsset={(assetId) => setSelectedAssetId(assetId)} />
+            )}
+
+            {currentView === "archived" && allowedPages.includes("archived") && (
+              <>
+                <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Search Archived Assets"
+                    value={archivedSearch}
+                    onChange={(e) => {
+                      setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
+                      setArchivedSearch(e.target.value);
+                    }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<FileDownloadOutlinedIcon />}
+                    onClick={handleExportArchivedExcel}
+                    disabled={archivedExporting || archivedRowCount === 0}
+                    sx={actionButtonSx}
+                  >
+                    {archivedExporting ? "Exporting..." : "Export Excel"}
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    startIcon={<FilterAltOffOutlinedIcon />}
+                    onClick={handleClearArchivedFilters}
+                    disabled={!hasActiveArchivedFilters}
+                    sx={{
+                      ...actionButtonSx,
+                      "&:hover": {
+                        bgcolor: "error.main",
+                        color: "error.contrastText",
+                        borderColor: "error.main",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                        transform: "translateY(-1px)",
+                      },
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </Paper>
+
+                <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+                  <DataGrid
+                    columnHeaderHeight={70}
+                    rows={archivedRows}
+                    columns={archivedColumns}
+                    loading={archivedLoading}
+                    rowCount={archivedRowCount}
+                    pagination
+                    paginationMode="server"
+                    sortingMode="server"
+                    paginationModel={archivedPaginationModel}
+                    onPaginationModelChange={setArchivedPaginationModel}
+                    sortModel={archivedSortModel}
+                    onSortModelChange={setArchivedSortModel}
+                    pageSizeOptions={[25, 50, 100]}
+                    disableRowSelectionOnClick
+                    onRowClick={(params) => setSelectedAssetId(params.row.id)}
                     sx={{
                       bgcolor: "background.paper",
                       cursor: "pointer",
