@@ -73,7 +73,7 @@ const NAV_ITEMS = [
   { key: "assets", label: "Assets", icon: <ComputerIcon /> },
   { key: "volumes", label: "Volumes", icon: <StorageIcon /> },
   { key: "softwares", label: "Softwares", icon: <SettingsApplicationsIcon /> },
-  { key: "impersonation", label: "Impersonation View", icon: <GroupIcon /> },
+  { key: "impersonation", label: "Impersonation", icon: <GroupIcon /> },
   { key: "archived", label: "Archived", icon: <InventoryIcon /> },
   { key: "admin", label: "Admin Users", icon: <AdminPanelSettingsIcon /> },
 ];
