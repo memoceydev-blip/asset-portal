@@ -1,10 +1,8 @@
-import PropTypes from "prop-types";
 import { Grid } from "@mui/material";
 import StatCard from "../components/StatCard";
+import MonitoringStatCard from "../components/MonitoringStatCard";
 
-export default function SummaryPage({ allowedPages }) {
-  if (!allowedPages.includes("summary")) return null;
-
+export default function SummaryPage() {
   return (
     <Grid container spacing={3}>
       <Grid item xs={12} md={6}>
@@ -73,10 +71,10 @@ export default function SummaryPage({ allowedPages }) {
           ]}
         />
       </Grid>
+
+      <Grid item xs={12} md={6}>
+        <MonitoringStatCard />
+      </Grid>
     </Grid>
   );
 }
-
-SummaryPage.propTypes = {
-  allowedPages: PropTypes.arrayOf(PropTypes.string).isRequired,
-};
