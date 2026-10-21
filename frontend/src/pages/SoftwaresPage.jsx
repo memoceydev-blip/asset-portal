@@ -6,9 +6,9 @@ import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { api } from "../api";
-import { actionButtonSx } from "../utils/helpers";
+import { actionButtonSx } from "../config/constants";
 
-export default function SoftwaresPage({ onSelectAsset, allowedPages }) {
+export default function SoftwaresPage({ onSelectAsset }) {
   const [softwareRows, setSoftwareRows] = useState([]);
   const [softwareLoading, setSoftwareLoading] = useState(false);
   const [softwareExporting, setSoftwareExporting] = useState(false);
@@ -47,8 +47,6 @@ export default function SoftwaresPage({ onSelectAsset, allowedPages }) {
   );
 
   useEffect(() => {
-    if (!allowedPages.includes("softwares")) return;
-
     const controller = new AbortController();
     const loadSoftwares = async () => {
       setSoftwareLoading(true);
@@ -84,7 +82,7 @@ export default function SoftwaresPage({ onSelectAsset, allowedPages }) {
 
     loadSoftwares();
     return () => controller.abort();
-  }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters, allowedPages]);
+  }, [softwarePaginationModel, softwareSortModel, debouncedSwFilters]);
 
   const handleExportSoftwaresExcel = async () => {
     setSoftwareExporting(true);
@@ -205,5 +203,4 @@ export default function SoftwaresPage({ onSelectAsset, allowedPages }) {
 
 SoftwaresPage.propTypes = {
   onSelectAsset: PropTypes.func.isRequired,
-  allowedPages: PropTypes.arrayOf(PropTypes.string).isRequired,
 };
