@@ -27,7 +27,7 @@ export default function AdminPage() {
   const [selectedTarget, setSelectedTarget] = useState(null);
   const [assignedRoleIds, setAssignedRoleIds] = useState([]);
   const [targetFilter, setTargetFilter] = useState("");
-  
+
   const [loading, setLoading] = useState(false);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -154,12 +154,7 @@ export default function AdminPage() {
         <Typography variant="h5" sx={{ fontWeight: 600 }}>
           User & Permission Administration
         </Typography>
-        <ToggleButtonGroup
-          size="small"
-          value={targetType}
-          exclusive
-          onChange={(_, val) => val && setTargetType(val)}
-        >
+        <ToggleButtonGroup size="small" value={targetType} exclusive onChange={(_, val) => val && setTargetType(val)}>
           <ToggleButton value="user">Users</ToggleButton>
           <ToggleButton value="group">Groups</ToggleButton>
         </ToggleButtonGroup>
@@ -193,15 +188,8 @@ export default function AdminPage() {
 
                     return (
                       <ListItem key={item.id} disablePadding divider>
-                        <ListItemButton 
-                          selected={isSelected} 
-                          onClick={() => setSelectedTarget(item)}
-                        >
-                          <ListItemText 
-                            primary={label} 
-                            secondary={subLabel || undefined} 
-                            primaryTypographyProps={{ fontWeight: isSelected ? 700 : 400 }}
-                          />
+                        <ListItemButton selected={isSelected} onClick={() => setSelectedTarget(item)}>
+                          <ListItemText primary={label} secondary={subLabel || undefined} primaryTypographyProps={{ fontWeight: isSelected ? 700 : 400 }} />
                         </ListItemButton>
                       </ListItem>
                     );
@@ -242,23 +230,11 @@ export default function AdminPage() {
                   return (
                     <ListItem key={role.id} divider>
                       <FormControlLabel
-                        control={
-                          <Checkbox
-                            checked={isAssigned}
-                            disabled={actionLoading}
-                            onChange={() => handleRoleToggle(role.id, isAssigned)}
-                          />
-                        }
+                        control={<Checkbox checked={isAssigned} disabled={actionLoading} onChange={() => handleRoleToggle(role.id, isAssigned)} />}
                         label={
                           <Box sx={{ ml: 1 }}>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                              {role.name || role.label}
-                            </Typography>
-                            {role.description && (
-                              <Typography variant="caption" color="text.secondary">
-                                {role.description}
-                              </Typography>
-                            )}
+                            <Typography variant="body1" sx={{ fontWeight: 500 }}>{role.name || role.label}</Typography>
+                            {role.description && <Typography variant="caption" color="text.secondary">{role.description}</Typography>}
                           </Box>
                         }
                         sx={{ width: "100%", m: 0 }}
