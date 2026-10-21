@@ -88,12 +88,7 @@ export default function StatCard({
   return (
     <Card sx={{ bgcolor: "background.paper", p: 1, height: "100%" }}>
       <CardContent>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          sx={{ mb: 0.5 }}
-        >
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 0.5 }}>
           <Box>
             <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
               {title}
@@ -162,21 +157,14 @@ export default function StatCard({
             </Grid>
 
             <Grid item xs={12} md={7}>
-              <TableContainer
-                component={Paper}
-                variant="outlined"
-                sx={{ maxHeight: 280, overflow: "auto" }}
-              >
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 280, overflow: "auto" }}>
                 <Table stickyHeader size="small" aria-label={`${title} counts table`}>
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>
                         {tableHeaderLabel}
                       </TableCell>
-                      <TableCell
-                        align="right"
-                        sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}
-                      >
+                      <TableCell align="right" sx={{ fontWeight: 600, bgcolor: "action.hover", width: 100 }}>
                         Count
                       </TableCell>
                     </TableRow>
@@ -187,10 +175,7 @@ export default function StatCard({
                         <TableCell component="th" scope="row" sx={{ fontWeight: 500 }}>
                           {row.name || "Unknown"}
                         </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
-                        >
+                        <TableCell align="right" sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}>
                           {row.count?.toLocaleString() || 0}
                         </TableCell>
                       </TableRow>
