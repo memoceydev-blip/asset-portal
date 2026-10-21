@@ -32,6 +32,8 @@ import AssetsPage from "./pages/AssetsPage";
 import SoftwaresPage from "./pages/SoftwaresPage";
 import ArchivedPage from "./pages/ArchivedPage";
 import AdminPage from "./pages/AdminPage";
+import VolumesPage from "./pages/VolumesPage";
+import ImpersonationPage from "./pages/ImpersonationPage";
 
 export default function App({ mode, onToggleColorMode }) {
   const [currentView, setCurrentView] = useState("summary");
@@ -93,10 +95,11 @@ export default function App({ mode, onToggleColorMode }) {
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 600 }}>
             {currentView === "summary" && "Infrastructure Metrics"}
             {currentView === "assets" && "Asset Master"}
+            {currentView === "volumes" && "Volumes Management"}
             {currentView === "softwares" && "Softwares Inventory"}
+            {currentView === "impersonation" && "Impersonation"}
             {currentView === "archived" && "Archived Assets"}
             {currentView === "admin" && "User Administration"}
-            {currentView === "impersonation" && "Impersonation"}
           </Typography>
 
           <Typography variant="body2" color="text.secondary">
@@ -151,29 +154,35 @@ export default function App({ mode, onToggleColorMode }) {
           <Box sx={{ width: "100%", py: 6 }}>
             <LinearProgress />
           </Box>
-        ) : permissionsError ? (
-          <Typography color="error" align="center" sx={{ py: 4 }}>
-            {permissionsError}
-          </Typography>
-        ) : (
-          <>
-            {currentView === "summary" && allowedPages.includes("summary") && (
-              <SummaryPage allowedPages={allowedPages} />
-            )}
-            {currentView === "assets" && allowedPages.includes("assets") && (
-              <AssetsPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
-            )}
-            {currentView === "archived" && allowedPages.includes("archived") && (
-              <ArchivedPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
-            )}
-            {currentView === "softwares" && allowedPages.includes("softwares") && (
-              <SoftwaresPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
-            )}
-            {currentView === "admin" && allowedPages.includes("admin") && (
-              <AdminPage />
-            )}
-          </>
-        )}
+      ) : permissionsError ? (
+        <Typography color="error" align="center" sx={{ py: 4 }}>
+          {permissionsError}
+        </Typography>
+      ) : (
+        <>
+          {currentView === "summary" && allowedPages.includes("summary") && (
+            <SummaryPage allowedPages={allowedPages} />
+          )}
+          {currentView === "assets" && allowedPages.includes("assets") && (
+            <AssetsPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
+          )}
+          {currentView === "volumes" && allowedPages.includes("volumes") && (
+            <VolumesPage allowedPages={allowedPages} />
+          )}
+          {currentView === "softwares" && allowedPages.includes("softwares") && (
+            <SoftwaresPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
+          )}
+          {currentView === "impersonation" && allowedPages.includes("impersonation") && (
+            <ImpersonationPage allowedPages={allowedPages} />
+          )}
+          {currentView === "archived" && allowedPages.includes("archived") && (
+            <ArchivedPage onSelectAsset={setSelectedAssetId} allowedPages={allowedPages} />
+          )}
+          {currentView === "admin" && allowedPages.includes("admin") && (
+            <AdminPage />
+          )}
+        </>
+      )}
       </Container>
 
       <AssetDetailsModal
