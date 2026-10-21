@@ -6,106 +6,135 @@ import axios from "axios";
 import { api } from "../api";
 
 export default function VolumesPage({ allowedPages }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [rowCount, setRowCount] = useState(0);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [paginationModel, setPaginationModel] = useState({ page: 0, pageSize: 50 });
-  const [sortModel, setSortModel] = useState([{ field: "id", sort: "asc" }]);
+  const [volumeRows, setVolumeRows] = useState([]);
+  const [volumeLoading, setVolumeLoading] = useState(false);
+  const [volumeExporting, setVolumeExporting] = useState(false);
+  const [volumeRowCount, setVolumeRowCount] = useState(0);
+  const [volumeSearch, setVolumeSearch] = useState("");
+  const [debouncedVolumeSearch, setDebouncedVolumeSearch] = useState("");
+  const [volumeColumnFilters, setVolumeColumnFilters] = useState({});
+  const [debouncedVolumeColumnFilters, setDebouncedVolumeColumnFilters] = useState({});
+  const [volumePaginationModel, setVolumePaginationModel] = useState({ page: 0, pageSize: 50 });
+  const [volumeSortModel, setVolumeSortModel] = useState([{ field: "id", sort: "asc" }]);
 
   useEffect(() => {
-    const delayHandler = setTimeout(() => setDebouncedSearch(search), 400);
+    const delayHandler = setTimeout(() => setDebouncedVolumeSearch(volumeSearch), 400);
     return () => clearTimeout(delayHandler);
-  }, [search]);
+  }, [volumeSearch]);
 
-  const columns = useMemo(
+  useEffect(() => {
+    const delayHandler = setTimeout(() => setDebouncedVolumeColumnFilters(volumeColumnFilters), 400);
+    return () => clearTimeout(volumeColumnFilters);
+  }, [volumeColumnFilters]);
+
+  const handleVolumeColumnFilterChange = (field, value) => {
+    setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+    setVolumeColumnFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleClearVolumeFilters = () => {
+    setVolumeSearch("");
+    setVolumeColumnFilters({});
+    setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+  };
+
+  const volumeColumns = useMemo(
     () => [
-      { field: "id", headerName: "ID", flex: 0.8 },
-      { field: "volume_name", headerName: "Volume Name", flex: 1.5 },
-      { field: "asset_id", headerName: "Asset ID", flex: 1 },
-      { field: "capacity_gb", headerName: "Capacity (GB)", flex: 1 },
-      { field: "used_gb", headerName: "Used (GB)", flex: 1 },
-      { field: "status", headerName: "Status", flex: 1 },
+      { field: "id", headerName: "ID", flex: 0.8, renderHeader: createHeaderWithFilter("id", "ID", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "volume_name", headerName: "Volume Name", flex: 1.4, renderHeader: createHeaderWithFilter("volume_name", "Volume Name", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "storage_name", headerName: "Storage Name", flex: 1.4, renderHeader: createHeaderWithFilter("storage_name", "Storage Name", volumeColumnFilters, handleVolumeColumnFilterChange) },
+      { field: "owner", headerName: "Owner", flex: 1.1, renderHeader: createHeaderWithFilter("owner", "Owner", volumeColumnFilters, handleVolumeColumnFilterChange) },
     ],
-    []
+    [volumeColumnFilters]
   );
 
   useEffect(() => {
-    if (!allowedPages.includes("volumes")) return;
+    if (currentView !== "volumes" || !allowedPages.includes("volumes")) return;
 
     const controller = new AbortController();
     const loadVolumes = async () => {
-      setLoading(true);
+      setVolumeLoading(true);
       try {
-        const sortBy = sortModel[0]?.field || "id";
-        const sortDir = sortModel[0]?.sort || "asc";
+        const sortBy = volumeSortModel[0]?.field || "id";
+        const sortDir = volumeSortModel[0]?.sort || "asc";
 
-        const response = await api.get("/api/v1/assets/volumes", {
+        const filterParams = {};
+        Object.entries(debouncedVolumeColumnFilters).forEach(([field, val]) => {
+          if (val && val.trim() !== "") {
+            filterParams[`${field}_filter`] = val.trim();
+          }
+        });
+
+        const response = await api.get("/api/v1/volumes", {
           signal: controller.signal,
           params: {
-            page: paginationModel.page + 1,
-            page_size: paginationModel.pageSize,
+            page: volumePaginationModel.page + 1,
+            page_size: volumePaginationModel.pageSize,
             sort_by: sortBy,
             sort_dir: sortDir,
-            search: debouncedSearch || undefined,
+            search: debouncedVolumeSearch || undefined,
+            ...filterParams,
           },
         });
 
-        setRows(response.data?.items || []);
-        setRowCount(response.data?.total || 0);
+        setVolumeRows(response.data?.items || []);
+        setVolumeRowCount(response.data?.total || 0);
       } catch (error) {
         if (axios.isCancel(error) || error.name === "CanceledError") return;
-        console.error("Error loading volumes data:", error);
+        console.error("Error loading volumes list:", error);
       } finally {
         if (!controller.signal.aborted) {
-          setLoading(false);
+          setVolumeLoading(false);
         }
       }
     };
 
     loadVolumes();
     return () => controller.abort();
-  }, [paginationModel, sortModel, debouncedSearch, allowedPages]);
+  }, [volumePaginationModel, volumeSortModel, debouncedVolumeSearch, debouncedVolumeColumnFilters, currentView, allowedPages]);
 
-  return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 2, maxWidth: 420 }}>
-        <TextField
-          fullWidth
-          size="small"
-          label="Search Volumes"
-          value={search}
-          onChange={(e) => {
-            setPaginationModel((prev) => ({ ...prev, page: 0 }));
-            setSearch(e.target.value);
-          }}
-        />
-      </Paper>
+  const handleExportVolumesExcel = async () => {
+    setVolumeExporting(true);
+    try {
+      const sortBy = volumeSortModel[0]?.field || "id";
+      const sortDir = volumeSortModel[0]?.sort || "asc";
 
-      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
-        <DataGrid
-          rows={rows}
-          columns={columns}
-          loading={loading}
-          rowCount={rowCount}
-          pagination
-          paginationMode="server"
-          sortingMode="server"
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
-          pageSizeOptions={[25, 50, 100]}
-          disableRowSelectionOnClick
-          sx={{
-            bgcolor: "background.paper",
-            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
-          }}
-        />
-      </Paper>
-    </Box>
-  );
+      const filterParams = {};
+      Object.entries(debouncedVolumeColumnFilters).forEach(([field, val]) => {
+        if (val && val.trim() !== "") {
+          filterParams[`${field}_filter`] = val.trim();
+        }
+      });
+
+      const response = await api.get("/api/v1/volumes", {
+        params: {
+          page: 1,
+          page_size: 100000,
+          sort_by: sortBy,
+          sort_dir: sortDir,
+          search: debouncedVolumeSearch || undefined,
+          ...filterParams,
+        },
+      });
+
+      const fullItems = response.data?.items || [];
+      if (fullItems.length === 0) return;
+
+      const worksheet = XLSX.utils.json_to_sheet(fullItems);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Volumes");
+      XLSX.writeFile(workbook, "volumes_full_export.xlsx");
+    } catch (error) {
+      console.error("Error fetching full volumes set for export:", error);
+    } finally {
+      setVolumeExporting(false);
+    }
+  };
+
+  const hasActiveVolumeFilters = useMemo(() => {
+    if (volumeSearch.trim() !== "") return true;
+    return Object.values(volumeColumnFilters).some((val) => val && val.trim() !== "");
+  }, [volumeSearch, volumeColumnFilters]);
 }
 
 VolumesPage.propTypes = {
