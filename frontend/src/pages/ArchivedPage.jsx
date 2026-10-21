@@ -7,9 +7,10 @@ import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
 import * as XLSX from "xlsx";
 import { api } from "../api";
-import { getPowerStateConfig, actionButtonSx } from "../utils/helpers";
+import { actionButtonSx } from "../config/constants";
+import { createHeaderWithFilter, getPowerStateConfig } from "../utils/helpers";
 
-export default function ArchivedPage({ onSelectAsset, allowedPages }) {
+export default function ArchivedPage({ onSelectAsset }) {
   const [archivedRows, setArchivedRows] = useState([]);
   const [archivedLoading, setArchivedLoading] = useState(false);
   const [archivedExporting, setArchivedExporting] = useState(false);
@@ -27,46 +28,19 @@ export default function ArchivedPage({ onSelectAsset, allowedPages }) {
   }, [archivedSearch]);
 
   useEffect(() => {
-    const delayHandler = setTimeout(() => {
-      setDebouncedArchivedColumnFilters(archivedColumnFilters);
-    }, 400);
+    const delayHandler = setTimeout(() => setDebouncedArchivedColumnFilters(archivedColumnFilters), 400);
     return () => clearTimeout(archivedColumnFilters);
   }, [archivedColumnFilters]);
 
   const handleArchivedColumnFilterChange = (field, value) => {
     setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
-    setArchivedColumnFilters((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setArchivedColumnFilters((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleClearArchivedFilters = () => {
     setArchivedSearch("");
     setArchivedColumnFilters({});
     setArchivedPaginationModel((prev) => ({ ...prev, page: 0 }));
-  };
-
-  const createHeaderWithFilter = (field, label, filterState, setFilterFn) => {
-    return () => (
-      <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 0.5, py: 1 }}>
-        <Typography variant="caption" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
-          {label}
-        </Typography>
-        <TextField
-          size="small"
-          placeholder="Filter..."
-          variant="outlined"
-          value={filterState[field] || ""}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setFilterFn(field, e.target.value)}
-          inputProps={{
-            style: { padding: "2px 6px", fontSize: "0.75rem" },
-          }}
-          sx={{ bgcolor: "background.paper" }}
-        />
-      </Box>
-    );
   };
 
   const archivedColumns = useMemo(
@@ -88,14 +62,7 @@ export default function ArchivedPage({ onSelectAsset, allowedPages }) {
           const cfg = getPowerStateConfig(params.value);
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, height: "100%" }}>
-              <Box 
-                sx={{ 
-                  width: 8, 
-                  height: 8, 
-                  borderRadius: "50%", 
-                  bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` 
-                }} 
-              />
+              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: cfg.color === "default" ? "text.disabled" : `${cfg.color}.main` }} />
               <Typography variant="body2">{cfg.label}</Typography>
             </Box>
           );
@@ -108,8 +75,6 @@ export default function ArchivedPage({ onSelectAsset, allowedPages }) {
   );
 
   useEffect(() => {
-    if (!allowedPages.includes("archived")) return;
-
     const controller = new AbortController();
     const loadArchived = async () => {
       setArchivedLoading(true);
@@ -150,7 +115,7 @@ export default function ArchivedPage({ onSelectAsset, allowedPages }) {
 
     loadArchived();
     return () => controller.abort();
-  }, [archivedPaginationModel, archivedSortModel, debouncedArchivedSearch, debouncedArchivedColumnFilters, allowedPages]);
+  }, [archivedPaginationModel, archivedSortModel, debouncedArchivedSearch, debouncedArchivedColumnFilters]);
 
   const handleExportArchivedExcel = async () => {
     setArchivedExporting(true);
@@ -268,5 +233,4 @@ export default function ArchivedPage({ onSelectAsset, allowedPages }) {
 
 ArchivedPage.propTypes = {
   onSelectAsset: PropTypes.func.isRequired,
-  allowedPages: PropTypes.arrayOf(PropTypes.string).isRequired,
 };
