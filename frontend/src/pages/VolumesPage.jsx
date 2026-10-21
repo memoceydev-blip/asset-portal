@@ -1,11 +1,16 @@
 import PropTypes from "prop-types";
 import { useEffect, useMemo, useState } from "react";
-import { Box, Paper, TextField, Typography } from "@mui/material";
+import { Button, Paper, TextField } from "@mui/material";
+import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
+import FilterAltOffOutlinedIcon from "@mui/icons-material/FilterAltOffOutlined";
 import { DataGrid } from "@mui/x-data-grid";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import { api } from "../api";
+import { actionButtonSx } from "../config/constants";
+import { createHeaderWithFilter } from "../utils/helpers";
 
-export default function VolumesPage({ allowedPages }) {
+export default function VolumesPage({ onSelectVolume }) {
   const [volumeRows, setVolumeRows] = useState([]);
   const [volumeLoading, setVolumeLoading] = useState(false);
   const [volumeExporting, setVolumeExporting] = useState(false);
@@ -49,8 +54,6 @@ export default function VolumesPage({ allowedPages }) {
   );
 
   useEffect(() => {
-    if (currentView !== "volumes" || !allowedPages.includes("volumes")) return;
-
     const controller = new AbortController();
     const loadVolumes = async () => {
       setVolumeLoading(true);
@@ -91,7 +94,7 @@ export default function VolumesPage({ allowedPages }) {
 
     loadVolumes();
     return () => controller.abort();
-  }, [volumePaginationModel, volumeSortModel, debouncedVolumeSearch, debouncedVolumeColumnFilters, currentView, allowedPages]);
+  }, [volumePaginationModel, volumeSortModel, debouncedVolumeSearch, debouncedVolumeColumnFilters]);
 
   const handleExportVolumesExcel = async () => {
     setVolumeExporting(true);
@@ -135,8 +138,78 @@ export default function VolumesPage({ allowedPages }) {
     if (volumeSearch.trim() !== "") return true;
     return Object.values(volumeColumnFilters).some((val) => val && val.trim() !== "");
   }, [volumeSearch, volumeColumnFilters]);
+
+  return (
+    <>
+      <Paper sx={{ p: 2, mb: 2, maxWidth: 780, display: "flex", gap: 2, alignItems: "center" }}>
+        <TextField
+          fullWidth
+          size="small"
+          label="Search Volumes"
+          value={volumeSearch}
+          onChange={(e) => {
+            setVolumePaginationModel((prev) => ({ ...prev, page: 0 }));
+            setVolumeSearch(e.target.value);
+          }}
+        />
+        <Button
+          variant="outlined"
+          startIcon={<FileDownloadOutlinedIcon />}
+          onClick={handleExportVolumesExcel}
+          disabled={volumeExporting || volumeRowCount === 0}
+          sx={actionButtonSx}
+        >
+          {volumeExporting ? "Exporting..." : "Export Excel"}
+        </Button>
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<FilterAltOffOutlinedIcon />}
+          onClick={handleClearVolumeFilters}
+          disabled={!hasActiveVolumeFilters}
+          sx={{
+            ...actionButtonSx,
+            "&:hover": {
+              bgcolor: "error.main",
+              color: "error.contrastText",
+              borderColor: "error.main",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+              transform: "translateY(-1px)",
+            },
+          }}
+        >
+          Clear Filters
+        </Button>
+      </Paper>
+
+      <Paper sx={{ height: 700, width: "100%", overflow: "hidden" }}>
+        <DataGrid
+          columnHeaderHeight={70}
+          rows={volumeRows}
+          columns={volumeColumns}
+          loading={volumeLoading}
+          rowCount={volumeRowCount}
+          pagination
+          paginationMode="server"
+          sortingMode="server"
+          paginationModel={volumePaginationModel}
+          onPaginationModelChange={setVolumePaginationModel}
+          sortModel={volumeSortModel}
+          onSortModelChange={setVolumeSortModel}
+          pageSizeOptions={[25, 50, 100]}
+          disableRowSelectionOnClick
+          onRowClick={(params) => onSelectVolume(params.row.id)}
+          sx={{
+            bgcolor: "background.paper",
+            cursor: "pointer",
+            '& .MuiDataGrid-columnHeaders': { bgcolor: "background.paper" },
+          }}
+        />
+      </Paper>
+    </>
+  );
 }
 
 VolumesPage.propTypes = {
-  allowedPages: PropTypes.arrayOf(PropTypes.string).isRequired,
+  onSelectVolume: PropTypes.func.isRequired,
 };
