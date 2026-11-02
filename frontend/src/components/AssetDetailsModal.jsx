@@ -55,10 +55,22 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
   const [details, setDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [softwareFilter, setSoftwareFilter] = useState("");
+  
   const [tabValue, setTabValue] = useState(0);
   const [selectedMount, setSelectedMount] = useState(null);
 
+  // Lazy-loaded data states
+  const [networksData, setNetworksData] = useState(null);
+  const [networksLoading, setNetworksLoading] = useState(false);
+
+  const [softwaresData, setSoftwaresData] = useState(null);
+  const [softwaresLoading, setSoftwaresLoading] = useState(false);
+  const [softwareFilter, setSoftwareFilter] = useState("");
+
+  const [mountsData, setMountsData] = useState(null);
+  const [mountsLoading, setMountsLoading] = useState(false);
+
+  // Initial load: Fetch only base asset details
   useEffect(() => {
     if (!open || !assetId) {
       setDetails(null);
@@ -66,6 +78,9 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
       setSoftwareFilter("");
       setTabValue(0);
       setSelectedMount(null);
+      setNetworksData(null);
+      setSoftwaresData(null);
+      setMountsData(null);
       return;
     }
 
@@ -113,21 +128,99 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     }
   }, [availableTabs, tabValue]);
 
-  const filteredSoftware = useMemo(() => {
-    if (!details?.software) return [];
-    const pattern = softwareFilter.trim().toLowerCase();
-    if (!pattern) return details.software;
+  const currentTabLabel = availableTabs[tabValue];
 
-    return details.software.filter((item) => {
+  // Lazy loading effect based on active tab
+  useEffect(() => {
+    if (!open || !assetId) return;
+
+    const controller = new AbortController();
+
+    // Fetch Networks (/assets/{id}/networks)
+    if (currentTabLabel === "Network" && !networksData && !networksLoading) {
+      const fetchNetworks = async () => {
+        setNetworksLoading(true);
+        try {
+          const res = await api.get(`/api/v1/assets/${assetId}/networks`, {
+            signal: controller.signal,
+          });
+          setNetworksData(res.data);
+        } catch (err) {
+          if (axios.isCancel(err) || err.name === "CanceledError") return;
+          console.error("Error loading networks data:", err);
+        } finally {
+          if (!controller.signal.aborted) {
+            setNetworksLoading(false);
+          }
+        }
+      };
+      fetchNetworks();
+    }
+
+    // Fetch Softwares (/assets/{id}/softwares)
+    if (currentTabLabel === "Softwares" && !softwaresData && !softwaresLoading) {
+      const fetchSoftwares = async () => {
+        setSoftwaresLoading(true);
+        try {
+          const res = await api.get(`/api/v1/assets/${assetId}/softwares`, {
+            signal: controller.signal,
+          });
+          setSoftwaresData(res.data?.items || res.data || []);
+        } catch (err) {
+          if (axios.isCancel(err) || err.name === "CanceledError") return;
+          console.error("Error loading softwares data:", err);
+        } finally {
+          if (!controller.signal.aborted) {
+            setSoftwaresLoading(false);
+          }
+        }
+      };
+      fetchSoftwares();
+    }
+
+    // Fetch Mounts (/assets/{id}/mounts)
+    if (currentTabLabel === "Mounts" && !mountsData && !mountsLoading) {
+      const fetchMounts = async () => {
+        setMountsLoading(true);
+        try {
+          const res = await api.get(`/api/v1/assets/${assetId}/mounts`, {
+            signal: controller.signal,
+          });
+          setMountsData(res.data?.items || res.data || []);
+        } catch (err) {
+          if (axios.isCancel(err) || err.name === "CanceledError") return;
+          console.error("Error loading mounts data:", err);
+        } finally {
+          if (!controller.signal.aborted) {
+            setMountsLoading(false);
+          }
+        }
+      };
+      fetchMounts();
+    }
+
+    return () => controller.abort();
+  }, [open, assetId, currentTabLabel, networksData, networksLoading, softwaresData, softwaresLoading, mountsData, mountsLoading]);
+
+  const filteredSoftware = useMemo(() => {
+    const list = softwaresData || details?.software || [];
+    const pattern = softwareFilter.trim().toLowerCase();
+    if (!pattern) return list;
+
+    return list.filter((item) => {
       const name = item?.sw_name?.toLowerCase() || "";
       const version = item?.sw_version?.toLowerCase() || "";
       return name.includes(pattern) || version.includes(pattern);
     });
-  }, [details, softwareFilter]);
+  }, [softwaresData, details?.software, softwareFilter]);
 
   const powerConfig = useMemo(() => {
     return getPowerStateConfig(details?.power_state);
   }, [details?.power_state]);
+
+  const neighbourPorts = networksData?.neighbour_ports || details?.neighbour_ports || [];
+  const ipAddresses = networksData?.ip_addresses || details?.ip_addresses || [];
+  const mountsList = mountsData || details?.mounts || [];
 
   return (
     <>
@@ -193,7 +286,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                   ))}
                 </Tabs>
 
-                {availableTabs[tabValue] === "Machine" && (
+                {currentTabLabel === "Machine" && (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Operating System</Typography>
@@ -248,63 +341,78 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                   </Stack>
                 )}
 
-                {availableTabs[tabValue] === "Network" && (
+                {currentTabLabel === "Network" && (
                   <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Network Neighbours</Typography>
-                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {details.neighbour_ports?.length ? details.neighbour_ports.map((item, index) => (
-                          <Chip key={`${item?.network_device || "device"}-${index}`} label={`${item?.network_device || "Unknown"} · ${item?.local_port || "?"} → ${item?.neighbour_port || "?"}`} variant="outlined" />
-                        )) : <Typography color="text.secondary" variant="body2">No network neighbour records available.</Typography>}
-                      </Stack>
-                    </Box>
-                    <Divider variant="dashed" />
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>IP Addresses</Typography>
-                      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                        {details.ip_addresses?.length ? details.ip_addresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />) : <Typography color="text.secondary" variant="body2">No active IP assignments.</Typography>}
-                      </Stack>
-                    </Box>
+                    {networksLoading && <LinearProgress sx={{ mb: 2 }} />}
+                    {!networksLoading && (
+                      <>
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Network Neighbours</Typography>
+                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                            {neighbourPorts?.length ? neighbourPorts.map((item, index) => (
+                              <Chip key={`${item?.network_device || "device"}-${index}`} label={`${item?.network_device || "Unknown"} · ${item?.local_port || "?"} → ${item?.neighbour_port || "?"}`} variant="outlined" />
+                            )) : <Typography color="text.secondary" variant="body2">No network neighbour records available.</Typography>}
+                          </Stack>
+                        </Box>
+                        <Divider variant="dashed" />
+                        <Box>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>IP Addresses</Typography>
+                          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                            {ipAddresses?.length ? ipAddresses.map((ip) => <Chip key={ip} label={ip} variant="outlined" />) : <Typography color="text.secondary" variant="body2">No active IP assignments.</Typography>}
+                          </Stack>
+                        </Box>
+                      </>
+                    )}
                   </Stack>
                 )}
 
-                {availableTabs[tabValue] === "Softwares" && (
+                {currentTabLabel === "Softwares" && (
                   <Box>
-                    <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Software Dependencies</Typography>
-                      <TextField size="small" label="Filter software list" value={softwareFilter} onChange={(e) => setSoftwareFilter(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 260 } }} />
-                    </Stack>
-                    {filteredSoftware.length ? (
-                      <List dense sx={{ maxHeight: 300, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                        {filteredSoftware.map((item, index) => (
-                          <ListItem key={item?.sw_name ? `${item.sw_name}-${index}` : index} divider>
-                            <ListItemText primary={`${item?.sw_name || "-"} ${item?.sw_version ? `(${item.sw_version})` : ""}`.trim()} />
-                          </ListItem>
-                        ))}
-                      </List>
-                    ) : <Typography color="text.secondary" variant="body2">No software matching filters found.</Typography>}
+                    {softwaresLoading && <LinearProgress sx={{ mb: 2 }} />}
+                    {!softwaresLoading && (
+                      <>
+                        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2} sx={{ mb: 2 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Software Dependencies</Typography>
+                          <TextField size="small" label="Filter software list" value={softwareFilter} onChange={(e) => setSoftwareFilter(e.target.value)} sx={{ minWidth: { xs: "100%", sm: 260 } }} />
+                        </Stack>
+                        {filteredSoftware.length ? (
+                          <List dense sx={{ maxHeight: 300, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                            {filteredSoftware.map((item, index) => (
+                              <ListItem key={item?.sw_name ? `${item.sw_name}-${index}` : index} divider>
+                                <ListItemText primary={`${item?.sw_name || "-"} ${item?.sw_version ? `(${item.sw_version})` : ""}`.trim()} />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : <Typography color="text.secondary" variant="body2">No software matching filters found.</Typography>}
+                      </>
+                    )}
                   </Box>
                 )}
 
-                {availableTabs[tabValue] === "Mounts" && (
+                {currentTabLabel === "Mounts" && (
                   <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Storage Mount Points</Typography>
-                    {details.mounts?.length ? (
-                      <List dense sx={{ maxHeight: 320, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                        {details.mounts.map((mount, index) => (
-                          <ListItem key={mount.id || index} disablePadding divider>
-                            <ListItemButton onClick={() => setSelectedMount(mount)}>
-                              <ListItemIcon sx={{ minWidth: 36 }}><StorageIcon fontSize="small" color="primary" /></ListItemIcon>
-                              <ListItemText primary={mount.mount_source || "Unknown Source"} secondary={mount.mount_path ? `Mounted on ${mount.mount_path}` : undefined} />
-                            </ListItemButton>
-                          </ListItem>
-                        ))}
-                      </List>
-                    ) : <Typography color="text.secondary" variant="body2">No mount point details available.</Typography>}
+                    {mountsLoading && <LinearProgress sx={{ mb: 2 }} />}
+                    {!mountsLoading && (
+                      <>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Storage Mount Points</Typography>
+                        {mountsList?.length ? (
+                          <List dense sx={{ maxHeight: 320, overflow: "auto", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                            {mountsList.map((mount, index) => (
+                              <ListItem key={mount.id || index} disablePadding divider>
+                                <ListItemButton onClick={() => setSelectedMount(mount)}>
+                                  <ListItemIcon sx={{ minWidth: 36 }}><StorageIcon fontSize="small" color="primary" /></ListItemIcon>
+                                  <ListItemText primary={mount.mount_source || "Unknown Source"} secondary={mount.mount_path ? `Mounted on ${mount.mount_path}` : undefined} />
+                                </ListItemButton>
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : <Typography color="text.secondary" variant="body2">No mount point details available.</Typography>}
+                      </>
+                    )}
                   </Box>
                 )}
 
-                {availableTabs[tabValue] === "Agent Status" && (
+                {currentTabLabel === "Agent Status" && (
                   <Stack spacing={3}>
                     {/* Section 1: Info Agent Status */}
                     <Box>
