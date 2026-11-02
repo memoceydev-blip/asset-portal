@@ -56,7 +56,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  // Use explicit string tab keys instead of numbers
+  // Use explicit string tab keys instead of numeric indexes
   const [tabValue, setTabValue] = useState("machine");
   const [selectedMount, setSelectedMount] = useState(null);
 
@@ -114,84 +114,60 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     return details?.type?.toLowerCase() === "storage";
   }, [details?.type]);
 
-  // Ensure active tab falls back to "machine" if selected tab is hidden
+  // Ensure active tab falls back to "machine" if a hidden tab was selected for storage
   useEffect(() => {
     if (isStorage && (tabValue === "softwares" || tabValue === "mounts")) {
       setTabValue("machine");
     }
   }, [isStorage, tabValue]);
 
-  // Lazy loading effect triggered when tab changes
+  // Lazy loading effect triggered when switching tabs (using stable dependency array)
   useEffect(() => {
     if (!open || !assetId) return;
 
     const controller = new AbortController();
 
-    // Fetch Networks (/assets/{id}/networks)
-    if (tabValue === "network" && !networksData && !networksLoading) {
-      const fetchNetworks = async () => {
-        setNetworksLoading(true);
-        try {
-          const res = await api.get(`/api/v1/assets/${assetId}/networks`, {
-            signal: controller.signal,
-          });
-          setNetworksData(res.data);
-        } catch (err) {
-          if (axios.isCancel(err) || err.name === "CanceledError") return;
-          console.error("Error loading networks data:", err);
-        } finally {
-          if (!controller.signal.aborted) {
-            setNetworksLoading(false);
+    // Fetch Networks (/api/v1/assets/{id}/networks)
+    if (tabValue === "network" && !networksData) {
+      setNetworksLoading(true);
+      api.get(`/api/v1/assets/${assetId}/networks`, { signal: controller.signal })
+        .then((res) => setNetworksData(res.data))
+        .catch((err) => {
+          if (!axios.isCancel(err) && err.name !== "CanceledError") {
+            console.error("Error loading networks data:", err);
           }
-        }
-      };
-      fetchNetworks();
+        })
+        .finally(() => setNetworksLoading(false));
     }
 
-    // Fetch Softwares (/assets/{id}/softwares)
-    if (tabValue === "softwares" && !softwaresData && !softwaresLoading) {
-      const fetchSoftwares = async () => {
-        setSoftwaresLoading(true);
-        try {
-          const res = await api.get(`/api/v1/assets/${assetId}/softwares`, {
-            signal: controller.signal,
-          });
-          setSoftwaresData(res.data?.items || res.data || []);
-        } catch (err) {
-          if (axios.isCancel(err) || err.name === "CanceledError") return;
-          console.error("Error loading softwares data:", err);
-        } finally {
-          if (!controller.signal.aborted) {
-            setSoftwaresLoading(false);
+    // Fetch Softwares (/api/v1/assets/{id}/softwares)
+    if (tabValue === "softwares" && !softwaresData) {
+      setSoftwaresLoading(true);
+      api.get(`/api/v1/assets/${assetId}/softwares`, { signal: controller.signal })
+        .then((res) => setSoftwaresData(res.data?.items || res.data || []))
+        .catch((err) => {
+          if (!axios.isCancel(err) && err.name !== "CanceledError") {
+            console.error("Error loading softwares data:", err);
           }
-        }
-      };
-      fetchSoftwares();
+        })
+        .finally(() => setSoftwaresLoading(false));
     }
 
-    // Fetch Mounts (/assets/{id}/mounts)
-    if (tabValue === "mounts" && !mountsData && !mountsLoading) {
-      const fetchMounts = async () => {
-        setMountsLoading(true);
-        try {
-          const res = await api.get(`/api/v1/assets/${assetId}/mounts`, {
-            signal: controller.signal,
-          });
-          setMountsData(res.data?.items || res.data || []);
-        } catch (err) {
-          if (axios.isCancel(err) || err.name === "CanceledError") return;
-          console.error("Error loading mounts data:", err);
-        } finally {
-          if (!controller.signal.aborted) {
-            setMountsLoading(false);
+    // Fetch Mounts (/api/v1/assets/{id}/mounts)
+    if (tabValue === "mounts" && !mountsData) {
+      setMountsLoading(true);
+      api.get(`/api/v1/assets/${assetId}/mounts`, { signal: controller.signal })
+        .then((res) => setMountsData(res.data?.items || res.data || []))
+        .catch((err) => {
+          if (!axios.isCancel(err) && err.name !== "CanceledError") {
+            console.error("Error loading mounts data:", err);
           }
-        }
-      };
-      fetchMounts();
+        })
+        .finally(() => setMountsLoading(false));
     }
 
     return () => controller.abort();
-  }, [open, assetId, tabValue, networksData, networksLoading, softwaresData, softwaresLoading, mountsData, mountsLoading]);
+  }, [open, assetId, tabValue]);
 
   const filteredSoftware = useMemo(() => {
     const list = softwaresData || details?.software || [];
@@ -467,7 +443,9 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
       </Dialog>
 
       <Dialog open={Boolean(selectedMount)} onClose={() => setSelectedMount(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}><StorageIcon color="primary" /> Mount Point Details</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 1 }}>
+          <StorageIcon color="primary" /> Mount Point Details
+        </DialogTitle>
         <DialogContent dividers>
           {selectedMount && (
             <Stack spacing={2}>
