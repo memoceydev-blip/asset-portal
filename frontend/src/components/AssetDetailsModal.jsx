@@ -56,7 +56,8 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   
-  const [tabValue, setTabValue] = useState(0);
+  // Use explicit string tab keys instead of numbers
+  const [tabValue, setTabValue] = useState("machine");
   const [selectedMount, setSelectedMount] = useState(null);
 
   // Lazy-loaded data states
@@ -70,13 +71,13 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
   const [mountsData, setMountsData] = useState(null);
   const [mountsLoading, setMountsLoading] = useState(false);
 
-  // Initial load: Fetch only base asset details
+  // Initial load: Fetch base asset details
   useEffect(() => {
     if (!open || !assetId) {
       setDetails(null);
       setError(null);
       setSoftwareFilter("");
-      setTabValue(0);
+      setTabValue("machine");
       setSelectedMount(null);
       setNetworksData(null);
       setSoftwaresData(null);
@@ -113,31 +114,21 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     return details?.type?.toLowerCase() === "storage";
   }, [details?.type]);
 
-  const availableTabs = useMemo(() => {
-    const tabs = ["Machine", "Network"];
-    if (!isStorage) {
-      tabs.push("Softwares", "Mounts");
-    }
-    tabs.push("Agent Status");
-    return tabs;
-  }, [isStorage]);
-
+  // Ensure active tab falls back to "machine" if selected tab is hidden
   useEffect(() => {
-    if (tabValue >= availableTabs.length) {
-      setTabValue(0);
+    if (isStorage && (tabValue === "softwares" || tabValue === "mounts")) {
+      setTabValue("machine");
     }
-  }, [availableTabs, tabValue]);
+  }, [isStorage, tabValue]);
 
-  const currentTabLabel = availableTabs[tabValue];
-
-  // Lazy loading effect based on active tab
+  // Lazy loading effect triggered when tab changes
   useEffect(() => {
     if (!open || !assetId) return;
 
     const controller = new AbortController();
 
     // Fetch Networks (/assets/{id}/networks)
-    if (currentTabLabel === "Network" && !networksData && !networksLoading) {
+    if (tabValue === "network" && !networksData && !networksLoading) {
       const fetchNetworks = async () => {
         setNetworksLoading(true);
         try {
@@ -158,7 +149,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     }
 
     // Fetch Softwares (/assets/{id}/softwares)
-    if (currentTabLabel === "Softwares" && !softwaresData && !softwaresLoading) {
+    if (tabValue === "softwares" && !softwaresData && !softwaresLoading) {
       const fetchSoftwares = async () => {
         setSoftwaresLoading(true);
         try {
@@ -179,7 +170,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     }
 
     // Fetch Mounts (/assets/{id}/mounts)
-    if (currentTabLabel === "Mounts" && !mountsData && !mountsLoading) {
+    if (tabValue === "mounts" && !mountsData && !mountsLoading) {
       const fetchMounts = async () => {
         setMountsLoading(true);
         try {
@@ -200,7 +191,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
     }
 
     return () => controller.abort();
-  }, [open, assetId, currentTabLabel, networksData, networksLoading, softwaresData, softwaresLoading, mountsData, mountsLoading]);
+  }, [open, assetId, tabValue, networksData, networksLoading, softwaresData, softwaresLoading, mountsData, mountsLoading]);
 
   const filteredSoftware = useMemo(() => {
     const list = softwaresData || details?.software || [];
@@ -281,12 +272,14 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
 
               <Box sx={{ width: "100%" }}>
                 <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} variant="fullWidth" sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}>
-                  {availableTabs.map((label) => (
-                    <Tab key={label} label={label} />
-                  ))}
+                  <Tab value="machine" label="Machine" />
+                  <Tab value="network" label="Network" />
+                  {!isStorage && <Tab value="softwares" label="Softwares" />}
+                  {!isStorage && <Tab value="mounts" label="Mounts" />}
+                  <Tab value="agents" label="Agent Status" />
                 </Tabs>
 
-                {currentTabLabel === "Machine" && (
+                {tabValue === "machine" && (
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Operating System</Typography>
@@ -306,42 +299,10 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                         <Box sx={{ minWidth: 180, flex: 1 }}><DetailRow label="Product Name" value={details.product_name} /></Box>
                       </Stack>
                     </Box>
-                    <Divider variant="dashed" />
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Registered Users</Typography>
-                      {details.user_info?.length ? (
-                        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
-                          <Table size="small" stickyHeader>
-                            <TableHead>
-                              <TableRow>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Username</TableCell>
-                                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Login Timestamp</TableCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {details.user_info.map((user, idx) => (
-                                <TableRow key={`${user.username || "user"}-${idx}`} hover>
-                                  <TableCell sx={{ fontFamily: "monospace" }}>{user.username || "-"}</TableCell>
-                                  <TableCell>
-                                    {user.last_login ? (
-                                      user.last_login
-                                    ) : (
-                                      <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>
-                                        Never logged in / Null record
-                                      </Typography>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      ) : <Typography color="text.secondary" variant="body2">No registered active workspace user logs metadata found.</Typography>}
-                    </Box>
                   </Stack>
                 )}
 
-                {currentTabLabel === "Network" && (
+                {tabValue === "network" && (
                   <Stack spacing={3}>
                     {networksLoading && <LinearProgress sx={{ mb: 2 }} />}
                     {!networksLoading && (
@@ -366,7 +327,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                   </Stack>
                 )}
 
-                {currentTabLabel === "Softwares" && (
+                {tabValue === "softwares" && !isStorage && (
                   <Box>
                     {softwaresLoading && <LinearProgress sx={{ mb: 2 }} />}
                     {!softwaresLoading && (
@@ -389,7 +350,7 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                   </Box>
                 )}
 
-                {currentTabLabel === "Mounts" && (
+                {tabValue === "mounts" && !isStorage && (
                   <Box>
                     {mountsLoading && <LinearProgress sx={{ mb: 2 }} />}
                     {!mountsLoading && (
@@ -412,9 +373,8 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                   </Box>
                 )}
 
-                {currentTabLabel === "Agent Status" && (
+                {tabValue === "agents" && (
                   <Stack spacing={3}>
-                    {/* Section 1: Info Agent Status */}
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
                         Info Agent Status
@@ -451,7 +411,6 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
 
                     <Divider variant="dashed" />
 
-                    {/* Section 2: Monitoring Status */}
                     <Box>
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2 }}>
                         Monitoring Status
