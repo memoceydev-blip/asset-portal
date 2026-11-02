@@ -256,28 +256,80 @@ export default function AssetDetailsModal({ assetId, open, onClose }) {
                 </Tabs>
 
                 {tabValue === "machine" && (
-                  <Stack spacing={3}>
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Operating System</Typography>
-                      <Grid container spacing={2}>
-                        {["Kernel", "OS Name", "OS Family", "Architecture", "Code Name", "CPE Name"].map((field) => (
-                          <Grid item xs={12} sm={6} md={4} key={field}>
-                            <DetailRow label={field} value={details[field.toLowerCase().replace(" ", "_")]} />
-                          </Grid>
-                        ))}
-                      </Grid>
-                    </Box>
-                    <Divider variant="dashed" />
-                    <Box>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Hardware Vendor Profile</Typography>
-                      <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
-                        <Box sx={{ minWidth: 180, flex: 1 }}><DetailRow label="Vendor" value={details.vendor} /></Box>
-                        <Box sx={{ minWidth: 180, flex: 1 }}><DetailRow label="Product Name" value={details.product_name} /></Box>
-                      </Stack>
-                    </Box>
-                  </Stack>
-                )}
+      <Stack spacing={3}>
+    {/* 1. Hardware Vendor Profile */}
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+        Hardware Vendor Profile
+      </Typography>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={3}>
+        <Box sx={{ minWidth: 180, flex: 1 }}>
+          <DetailRow label="Vendor" value={details.vendor} />
+        </Box>
+        <Box sx={{ minWidth: 180, flex: 1 }}>
+          <DetailRow label="Product Name" value={details.product_name} />
+        </Box>
+      </Stack>
+    </Box>
 
+    <Divider variant="dashed" />
+
+    {/* 2. Operating System */}
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+        Operating System
+      </Typography>
+      <Grid container spacing={2}>
+        {["Kernel", "OS Name", "OS Family", "Architecture", "Code Name", "CPE Name"].map((field) => (
+          <Grid item xs={12} sm={6} md={4} key={field}>
+            <DetailRow label={field} value={details[field.toLowerCase().replace(" ", "_")]} />
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+
+    <Divider variant="dashed" />
+
+    {/* 3. Registered Users */}
+    <Box>
+      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+        Registered Users
+      </Typography>
+      {details.user_info?.length ? (
+        <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 200 }}>
+          <Table size="small" stickyHeader aria-label="Registered users list">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Username</TableCell>
+                <TableCell sx={{ fontWeight: 600, bgcolor: "action.hover" }}>Last Login Timestamp</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {details.user_info.map((user, idx) => (
+                <TableRow key={`${user.username || "user"}-${idx}`} hover>
+                  <TableCell sx={{ fontFamily: "monospace" }}>{user.username || "-"}</TableCell>
+                  <TableCell>
+                    {user.last_login ? (
+                      user.last_login
+                    ) : (
+                      <Typography variant="caption" color="text.disabled" sx={{ fontStyle: "italic" }}>
+                        Never logged in / Null record
+                      </Typography>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Typography color="text.secondary" variant="body2">
+          No registered active workspace user logs metadata found.
+        </Typography>
+      )}
+    </Box>
+  </Stack>
+)}
                 {tabValue === "network" && (
                   <Stack spacing={3}>
                     {networksLoading && <LinearProgress sx={{ mb: 2 }} />}
