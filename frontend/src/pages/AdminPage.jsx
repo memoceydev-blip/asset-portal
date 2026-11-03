@@ -183,8 +183,8 @@ export default function AdminPage() {
                 {targetList.length > 0 ? (
                   targetList.map((item) => {
                     const isSelected = selectedTarget?.id === item.id;
-                    const label = item.name || item.username || item.label || `ID: ${item.id}`;
-                    const subLabel = item.email || item.description || "";
+                    const label = item.name || item.username || item.description || `ID: ${item.id}`;
+                    const subLabel = item.email || item.label || "";
 
                     return (
                       <ListItem key={item.id} disablePadding divider>
