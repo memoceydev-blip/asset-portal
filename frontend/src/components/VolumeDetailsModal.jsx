@@ -82,6 +82,12 @@ export default function VolumeDetailsModal({ volumeId, open, onClose }) {
         renderHeader: createHeaderWithFilter("server_owner", "Server Owner", columnFilters, handleFilterChange),
       },
       {
+        field: "mount_source",
+        headerName: "Mount Source",
+        flex: 1.5,
+        renderHeader: createHeaderWithFilter("mount_source", "Mount Source", columnFilters, handleFilterChange),
+      },
+      {
         field: "mount_path",
         headerName: "Mount Path",
         flex: 1.5,
@@ -120,6 +126,7 @@ export default function VolumeDetailsModal({ volumeId, open, onClose }) {
         "Volume Owner": details?.owner || "",
         "Server Name": srv.server_name || "",
         "Server Owner": srv.server_owner || "",
+        "Mount Source": srv.mount_source || "",
         "Mount Path": srv.mount_path || "",
         "Mount Type": srv.mount_type || "",
       }));
@@ -141,7 +148,7 @@ export default function VolumeDetailsModal({ volumeId, open, onClose }) {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
       <DialogTitle
         sx={{
           display: "flex",
@@ -190,7 +197,7 @@ export default function VolumeDetailsModal({ volumeId, open, onClose }) {
                 columnHeaderHeight={70}
                 rows={filteredServers}
                 columns={columns}
-                getRowId={(row) => row.id || `${row.server_name}-${row.mount_path}`}
+                getRowId={(row) => row.id || `${row.server_name}-${row.mount_path}-${row.mount_source || ""}`}
                 pageSizeOptions={[10, 25, 50]}
                 initialState={{
                   pagination: { paginationModel: { pageSize: 10 } },
